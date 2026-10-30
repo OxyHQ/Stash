@@ -28,10 +28,7 @@ describe('sorting', () => {
   });
 
   test('puts folders before even an empty file by size', () => {
-    const withEmpty = [
-      local('a.txt', { size: 0 }),
-      local('Zed', { isFolder: true, size: null }),
-    ];
+    const withEmpty = [local('a.txt', { size: 0 }), local('Zed', { isFolder: true, size: null })];
     expect(
       sortItems(withEmpty, { column: 'size', direction: 'ascending' }).map((item) => item.name),
     ).toEqual(['Zed', 'a.txt']);

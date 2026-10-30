@@ -29,7 +29,10 @@ describe('the folder store', () => {
     await settle();
     expect(told).toBeGreaterThan(0);
     const next = store.getFolderState(uri('Shown'));
-    expect(next.status === 'ready' && next.items.map((item) => item.name).sort()).toEqual(['a.txt', 'b.txt']);
+    expect(next.status === 'ready' && next.items.map((item) => item.name).sort()).toEqual([
+      'a.txt',
+      'b.txt',
+    ]);
     stop();
   });
 
