@@ -73,6 +73,7 @@ export const ItemRow = memo(function ItemRow({
   return (
     <View
       testID={`item-${item.name}`}
+      accessible
       accessibilityRole="listitem"
       accessibilityLabel={item.name}
       aria-selected={isSelected}

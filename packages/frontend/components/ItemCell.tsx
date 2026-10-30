@@ -50,6 +50,8 @@ export const ItemCell = memo(function ItemCell({
   const kind = itemKind(item);
   const accessibility = {
     testID: `item-${item.name}`,
+    // One element for assistive technology, its icon and name read as it.
+    accessible: true,
     accessibilityRole: 'listitem' as const,
     accessibilityLabel: item.name,
     'aria-selected': isSelected,
