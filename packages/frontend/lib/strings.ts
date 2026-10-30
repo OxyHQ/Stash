@@ -155,6 +155,7 @@ const en = {
     deleteAlbumAction: 'Delete Album',
   },
   albumName: 'Album name',
+  renameAlbumTitle: 'Rename Album',
   nameProblems: {
     empty: 'A name cannot be empty.',
     slash: 'A name cannot contain “/”.',
@@ -172,6 +173,8 @@ const en = {
   } satisfies Record<FileProblem, string>,
   couldNotLoad: 'Stash could not load this.',
   couldNotOpenFolder: 'Stash could not open this folder.',
+  couldNotChange: 'Stash could not do that. Try again.',
+  cloudProblem: (name: string) => `Oxy Files could not change “${name}”.`,
   transfers: {
     uploading: (count: number, percent: string) =>
       count === 1 ? `Uploading 1 item… ${percent}` : `Uploading ${count} items… ${percent}`,
@@ -359,6 +362,7 @@ const es: Strings = {
     deleteAlbumAction: 'Eliminar álbum',
   },
   albumName: 'Nombre del álbum',
+  renameAlbumTitle: 'Renombrar álbum',
   nameProblems: {
     empty: 'Un nombre no puede estar vacío.',
     slash: 'Un nombre no puede contener «/».',
@@ -376,6 +380,8 @@ const es: Strings = {
   },
   couldNotLoad: 'Stash no ha podido cargar esto.',
   couldNotOpenFolder: 'Stash no ha podido abrir esta carpeta.',
+  couldNotChange: 'Stash no ha podido hacerlo. Inténtalo de nuevo.',
+  cloudProblem: (name) => `Oxy Files no ha podido cambiar «${name}».`,
   transfers: {
     uploading: (count, percent) =>
       count === 1 ? `Subiendo 1 elemento… ${percent}` : `Subiendo ${count} elementos… ${percent}`,

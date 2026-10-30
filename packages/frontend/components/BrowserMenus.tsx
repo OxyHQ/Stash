@@ -1,0 +1,322 @@
+/**
+ * The window's menus, as ADR 0027 lists them: File, Edit, View and Go, with
+ * their shortcuts. Where the platform has a menu bar of its own (OxyOS's top
+ * bar) Bloom's `Menubar` describes them to it; elsewhere it draws them in the
+ * window.
+ */
+import {
+  Menubar,
+  MenubarCheckboxItem,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarRadioGroup,
+  MenubarRadioItem,
+  MenubarSeparator,
+  MenubarSub,
+  MenubarSubContent,
+  MenubarSubTrigger,
+  MenubarTrigger,
+} from '@oxy.so/bloom/menubar';
+import type { ViewMode } from '@/components/BrowserProvider';
+import type { Commands } from '@/hooks/use-commands';
+import { useLocale } from '@/hooks/use-locale';
+import type { Location } from '@/lib/items';
+import type { LocalPlace } from '@/lib/local-places';
+import type { SortColumn, SortOrder } from '@/lib/sorting';
+
+const SORT_COLUMNS: readonly SortColumn[] = ['name', 'kind', 'date', 'size'];
+
+function isViewMode(value: string): value is ViewMode {
+  return value === 'icons' || value === 'list';
+}
+
+function isSortColumn(value: string): value is SortColumn {
+  return SORT_COLUMNS.some((column) => column === value);
+}
+
+export function BrowserMenus({
+  commands,
+  location,
+  places,
+  viewMode,
+  onViewMode,
+  order,
+  onSortColumn,
+  isShowingHidden,
+  onShowingHidden,
+  canGoBack,
+  canGoForward,
+  onBack,
+  onForward,
+  onEnclosing,
+  onGo,
+}: {
+  commands: Commands;
+  location: Location;
+  places: readonly LocalPlace[];
+  viewMode: ViewMode;
+  onViewMode: (mode: ViewMode) => void;
+  order: SortOrder;
+  onSortColumn: (column: SortColumn) => void;
+  isShowingHidden: boolean;
+  onShowingHidden: (isShowing: boolean) => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
+  onEnclosing: (() => void) | null;
+  onGo: (location: Location) => void;
+}) {
+  const { strings } = useLocale();
+  const isInTrash = location.kind === 'trash';
+  const home = places.find((place) => place.kind === 'home');
+  return (
+    <Menubar>
+      <MenubarMenu value="file">
+        <MenubarTrigger>{strings.menus.file}</MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem
+            shortcut="Mod+Shift+N"
+            disabled={!commands.newFolder.isEnabled}
+            onPress={commands.newFolder.run}
+          >
+            {strings.menus.newFolder}
+          </MenubarItem>
+          <MenubarItem
+            shortcut="Mod+Alt+N"
+            disabled={!commands.newAlbum.isEnabled}
+            onPress={commands.newAlbum.run}
+          >
+            {strings.menus.newAlbum}
+          </MenubarItem>
+          <MenubarItem
+            shortcut="Mod+O"
+            disabled={!commands.open.isEnabled}
+            onPress={commands.open.run}
+          >
+            {strings.menus.open}
+          </MenubarItem>
+          <MenubarItem
+            shortcut="Mod+Y"
+            disabled={!commands.preview.isEnabled}
+            onPress={commands.preview.run}
+          >
+            {strings.menus.preview}
+          </MenubarItem>
+          <MenubarSeparator />
+          {isInTrash ? (
+            <>
+              <MenubarItem disabled={!commands.putBack.isEnabled} onPress={commands.putBack.run}>
+                {strings.menus.putBack}
+              </MenubarItem>
+              <MenubarItem
+                shortcut="Mod+Alt+Backspace"
+                disabled={!commands.eraseNow.isEnabled}
+                onPress={commands.eraseNow.run}
+              >
+                {strings.menus.deleteImmediately}
+              </MenubarItem>
+            </>
+          ) : (
+            <>
+              <MenubarItem disabled={!commands.rename.isEnabled} onPress={commands.rename.run}>
+                {strings.menus.rename}
+              </MenubarItem>
+              {commands.hasPlatformTrash || !commands.deleteForGood.isEnabled ? (
+                <MenubarItem
+                  shortcut="Mod+Backspace"
+                  disabled={!commands.moveToTrash.isEnabled}
+                  onPress={commands.moveToTrash.run}
+                >
+                  {strings.menus.moveToTrash}
+                </MenubarItem>
+              ) : (
+                <MenubarItem
+                  shortcut="Mod+Backspace"
+                  disabled={!commands.deleteForGood.isEnabled}
+                  onPress={commands.deleteForGood.run}
+                >
+                  {strings.menus.deleteForGood}
+                </MenubarItem>
+              )}
+            </>
+          )}
+          <MenubarSeparator />
+          <MenubarItem disabled={!commands.upload.isEnabled} onPress={commands.upload.run}>
+            {strings.menus.upload}
+          </MenubarItem>
+          {commands.uploadPicked.isEnabled ? (
+            <MenubarItem shortcut="Mod+U" onPress={commands.uploadPicked.run}>
+              {strings.menus.uploadFiles}
+            </MenubarItem>
+          ) : null}
+          <MenubarItem disabled={!commands.download.isEnabled} onPress={commands.download.run}>
+            {strings.menus.download}
+          </MenubarItem>
+          {commands.downloadTo.length > 0 ? (
+            <MenubarSub>
+              <MenubarSubTrigger disabled={!commands.download.isEnabled}>
+                {strings.menus.downloadTo}
+              </MenubarSubTrigger>
+              <MenubarSubContent>
+                {commands.downloadTo.map(({ place, command }) => (
+                  <MenubarItem key={place.uri} disabled={!command.isEnabled} onPress={command.run}>
+                    {place.name}
+                  </MenubarItem>
+                ))}
+              </MenubarSubContent>
+            </MenubarSub>
+          ) : null}
+          {commands.addToAlbum.length > 0 ? (
+            <MenubarSub>
+              <MenubarSubTrigger
+                disabled={!commands.addToAlbum.some(({ command }) => command.isEnabled)}
+              >
+                {strings.menus.addToAlbum}
+              </MenubarSubTrigger>
+              <MenubarSubContent>
+                {commands.addToAlbum.map(({ album, command }) => (
+                  <MenubarItem key={album.id} disabled={!command.isEnabled} onPress={command.run}>
+                    {album.name}
+                  </MenubarItem>
+                ))}
+              </MenubarSubContent>
+            </MenubarSub>
+          ) : null}
+          {location.kind === 'album' || location.kind === 'albums' ? (
+            <>
+              <MenubarSeparator />
+              {location.kind === 'album' ? (
+                <MenubarItem
+                  disabled={!commands.removeFromAlbum.isEnabled}
+                  onPress={commands.removeFromAlbum.run}
+                >
+                  {strings.menus.removeFromAlbum}
+                </MenubarItem>
+              ) : null}
+              <MenubarItem
+                disabled={!commands.renameAlbum.isEnabled}
+                onPress={commands.renameAlbum.run}
+              >
+                {strings.menus.renameAlbum}
+              </MenubarItem>
+              <MenubarItem
+                disabled={!commands.deleteAlbum.isEnabled}
+                onPress={commands.deleteAlbum.run}
+              >
+                {strings.menus.deleteAlbum}
+              </MenubarItem>
+            </>
+          ) : null}
+          <MenubarSeparator />
+          <MenubarItem
+            shortcut="Mod+Shift+Backspace"
+            disabled={!commands.emptyTrash.isEnabled}
+            onPress={commands.emptyTrash.run}
+          >
+            {strings.menus.emptyTrash}
+          </MenubarItem>
+          {commands.signIn.isEnabled ? (
+            <>
+              <MenubarSeparator />
+              <MenubarItem onPress={commands.signIn.run}>{strings.menus.signIn}</MenubarItem>
+            </>
+          ) : null}
+        </MenubarContent>
+      </MenubarMenu>
+      <MenubarMenu value="edit">
+        <MenubarTrigger>{strings.menus.edit}</MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem
+            shortcut="Mod+A"
+            disabled={!commands.selectAll.isEnabled}
+            onPress={commands.selectAll.run}
+          >
+            {strings.menus.selectAll}
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+      <MenubarMenu value="view">
+        <MenubarTrigger>{strings.menus.view}</MenubarTrigger>
+        <MenubarContent>
+          <MenubarRadioGroup
+            value={viewMode}
+            onValueChange={(next) => {
+              if (isViewMode(next)) onViewMode(next);
+            }}
+          >
+            <MenubarRadioItem value="icons" shortcut="Mod+1">
+              {strings.asIcons}
+            </MenubarRadioItem>
+            <MenubarRadioItem value="list" shortcut="Mod+2">
+              {strings.asList}
+            </MenubarRadioItem>
+          </MenubarRadioGroup>
+          <MenubarSeparator />
+          <MenubarSub>
+            <MenubarSubTrigger>{strings.menus.sortBy}</MenubarSubTrigger>
+            <MenubarSubContent>
+              <MenubarRadioGroup
+                value={order.column}
+                onValueChange={(next) => {
+                  if (isSortColumn(next)) onSortColumn(next);
+                }}
+              >
+                {SORT_COLUMNS.map((column) => (
+                  <MenubarRadioItem key={column} value={column}>
+                    {column === 'date' && isInTrash
+                      ? strings.columns.deleted
+                      : strings.columns[column]}
+                  </MenubarRadioItem>
+                ))}
+              </MenubarRadioGroup>
+            </MenubarSubContent>
+          </MenubarSub>
+          <MenubarSeparator />
+          <MenubarCheckboxItem
+            checked={isShowingHidden}
+            onCheckedChange={onShowingHidden}
+            shortcut="Mod+Shift+."
+          >
+            {strings.menus.showHidden}
+          </MenubarCheckboxItem>
+        </MenubarContent>
+      </MenubarMenu>
+      <MenubarMenu value="go">
+        <MenubarTrigger>{strings.menus.go}</MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem shortcut="Mod+[" disabled={!canGoBack} onPress={onBack}>
+            {strings.back}
+          </MenubarItem>
+          <MenubarItem shortcut="Mod+]" disabled={!canGoForward} onPress={onForward}>
+            {strings.forward}
+          </MenubarItem>
+          <MenubarItem
+            shortcut="Mod+ArrowUp"
+            disabled={onEnclosing === null}
+            onPress={() => onEnclosing?.()}
+          >
+            {strings.menus.enclosing}
+          </MenubarItem>
+          <MenubarSeparator />
+          {places.map((place) => (
+            <MenubarItem
+              key={place.uri}
+              shortcut={place === home ? 'Mod+Shift+H' : undefined}
+              onPress={() => onGo({ kind: 'folder', uri: place.uri })}
+            >
+              {place.name}
+            </MenubarItem>
+          ))}
+          <MenubarItem shortcut="Mod+Shift+I" onPress={() => onGo({ kind: 'cloud' })}>
+            {strings.cloud}
+          </MenubarItem>
+          <MenubarItem onPress={() => onGo({ kind: 'photos' })}>{strings.photos}</MenubarItem>
+          <MenubarItem onPress={() => onGo({ kind: 'albums' })}>{strings.albums}</MenubarItem>
+          <MenubarItem onPress={() => onGo({ kind: 'trash' })}>{strings.trash}</MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+    </Menubar>
+  );
+}
