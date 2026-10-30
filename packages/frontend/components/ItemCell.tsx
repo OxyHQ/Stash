@@ -3,8 +3,9 @@
  * its square. It draws itself where the grid places it and again only when
  * something it shows changes.
  *
- * A name runs to two lines, cut in the middle where it is longer, as Finder
- * cuts one; selected, it is shown whole, over the row below if it must be.
+ * A name runs to two lines, its last cut short where it is longer (a platform
+ * cuts the middle of one line only); selected, it is shown whole, over the
+ * row below if it must be, as Finder shows it.
  */
 import { Text } from '@oxy.so/bloom/typography';
 import { memo } from 'react';
@@ -116,7 +117,7 @@ export const ItemCell = memo(function ItemCell({
           <Text
             variant="caption-1-regular"
             numberOfLines={isSelected ? undefined : 2}
-            ellipsizeMode="middle"
+            ellipsizeMode="tail"
             selectable={false}
             className={`text-center ${textClass}`}
           >
