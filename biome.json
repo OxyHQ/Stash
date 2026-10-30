@@ -1,0 +1,123 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!.worktrees",
+      "!**/dist",
+      "!**/coverage",
+      "!**/.expo",
+      "!**/.next",
+      "!**/drizzle/meta",
+      "!**/*.generated.*",
+      "!docs/audits",
+      "!packages/frontend/assets"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always",
+      "bracketSpacing": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        "noImportantStyles": "warn",
+        "useOptionalChain": "warn"
+      },
+      "correctness": {
+        "noUnusedFunctionParameters": "warn",
+        "noUnusedImports": "warn",
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "error",
+        "useIsNan": "error",
+        "useValidTypeof": "error",
+        "useJsxKeyInIterable": "error",
+        "noChildrenProp": "error",
+        "noRenderReturnValue": "error"
+      },
+      "nursery": {
+        "noReactStringRefs": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtmlWithChildren": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useImportType": "warn",
+        "useNodejsImportProtocol": "info",
+        "useTemplate": "info"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn",
+        "useIterableCallbackReturn": "warn",
+        "noDuplicateParameters": "error",
+        "noDuplicateObjectKeys": "error",
+        "noDuplicateCase": "error",
+        "noVar": "error",
+        "noDuplicateClassMembers": "error",
+        "noCommentText": "error",
+        "noDuplicateJsxProps": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/frontend/**", "packages/ui/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@oxy.so/services": "The root entry registers every Oxy account screen at import, which puts them in first paint. Import from '@oxy.so/services/ui/client' (or a type from '@oxy.so/services/ui')."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

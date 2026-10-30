@@ -1,0 +1,39 @@
+##
+## Docker Compose — the local PostgreSQL a developer runs beside the backend.
+##
+## Mirrors OxyHQ/Mention's own `docker-compose.postgres.yml`: plain Postgres
+## (this schema needs no PostGIS/pgvector/pg_trgm), port 5434 rather than 5432
+## so it does not collide with a system Postgres, and a disposable volume-backed
+## database for local development.
+##
+## Usage:
+##   docker compose -f docker-compose.postgres.yml up -d postgres
+##   docker compose -f docker-compose.postgres.yml logs -f postgres
+##   docker compose -f docker-compose.postgres.yml down -v   # wipe (data is disposable)
+##
+## Then in packages/backend/.env:
+##   DATABASE_URL=postgres://stash:stash@127.0.0.1:5434/stash_dev
+##
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: stash-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: stash
+      POSTGRES_PASSWORD: stash
+      POSTGRES_DB: stash_dev
+    ports:
+      - '127.0.0.1:5434:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U stash -d stash_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - stash-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  stash-postgres-data:

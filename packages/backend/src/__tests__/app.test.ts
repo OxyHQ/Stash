@@ -1,0 +1,38 @@
+/**
+ * The probes of the production app (`createApp`), against a REAL Postgres
+ * migrated to this build (see `services/__tests__/albums.service.test.ts`).
+ */
+
+import { afterAll, beforeAll, expect, test } from 'bun:test';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { OxyServer } from '@oxy.so/core/server';
+import { createApp } from '../app';
+import { closePostgres, connectPostgres } from '../db/postgres';
+
+let server: Server;
+let base: string;
+
+beforeAll(async () => {
+  await connectPostgres();
+  // The probes never call Oxy; an unroutable address proves it.
+  const oxy = new OxyServer({ baseURL: 'http://127.0.0.1:9' });
+  server = createApp(oxy, { read: async () => [] }).listen(0);
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  server.close();
+  await closePostgres();
+});
+
+test('is live and, with every migration applied, ready', async () => {
+  expect((await fetch(`${base}/health`)).status).toBe(200);
+  const ready = await fetch(`${base}/ready`);
+  expect(ready.status).toBe(200);
+  expect(await ready.json()).toEqual({ status: 'ready' });
+});
+
+test('refuses /albums with no session', async () => {
+  expect((await fetch(`${base}/albums`)).status).toBe(401);
+});
