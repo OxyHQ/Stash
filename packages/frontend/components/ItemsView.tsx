@@ -34,6 +34,7 @@ import {
 import {
   type AccessibilityActionInfo,
   type GestureResponderEvent,
+  Keyboard,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -275,6 +276,9 @@ export function ItemsView({
     // The name being edited takes its own presses.
     if (item && item.key === renamingKey) return;
     if (renamingKey) onRenameDone();
+    // A press among the items takes the keys from a field (the search), as
+    // Finder's does, so the arrows and type-select act on the items again.
+    Keyboard.dismiss();
     const isToggling = isCommandKey(event.nativeEvent);
     if (button === 2) {
       // A menu is for the selection, which the item joins if it is not in it;
