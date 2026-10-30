@@ -32,6 +32,8 @@ function familyOf(location: Location): ViewFamily {
 
 interface BrowserValue {
   location: Location | null;
+  /** Where the window was before it came here: what it selects as it arrives. */
+  cameFrom: Location | null;
   history: History | null;
   navigate: (location: Location) => void;
   goBack: () => void;
@@ -64,6 +66,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     files: NAME_ORDER,
     media: { column: 'date', direction: 'descending' },
   });
+  const [cameFrom, setCameFrom] = useState<Location | null>(null);
   const [isShowingHidden, setShowingHidden] = useState(false);
   const [isNewAlbumOpen, setNewAlbumOpen] = useState(false);
 
@@ -72,6 +75,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
   const current = history ? currentLocation(history) : null;
   if (routed && (!current || !sameLocation(current, routed))) {
     setHistory(history ? arrive(history, routed) : historyAt(routed));
+    setCameFrom(current);
   }
   // Where the window is, as the history holds it: the same object for as long
   // as the window stays there, so what shows it draws again only when it moves.
@@ -79,6 +83,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
 
   const value: BrowserValue = {
     location,
+    cameFrom,
     history,
     navigate: (next) => {
       if (location && sameLocation(location, next)) return;

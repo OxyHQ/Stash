@@ -29,11 +29,12 @@ import { useBrowserKeys } from '@/hooks/use-browser-keys';
 import { type ConfirmRequest, useCommands } from '@/hooks/use-commands';
 import { useLocale } from '@/hooks/use-locale';
 import { useLocalPlaces } from '@/hooks/use-local-places';
+import { selectionOnArrival } from '@/lib/history';
 import { previewOnPlatform } from '@/lib/local-files';
 import { type Item, itemKind, type LocalItem, type Location } from '@/lib/items';
 import { gridColumns, type ItemsLayout } from '@/lib/items-layout';
 import { isSameUri, parentUri, pathParts, placeOf, uriName } from '@/lib/local-places';
-import { isSelected, keepShown, NO_SELECTION, type Selection, selectAll } from '@/lib/selection';
+import { isSelected, keepShown, type Selection, selectAll } from '@/lib/selection';
 import { sortBy, sortItems, visibleItems } from '@/lib/sorting';
 
 /** A picture larger than this is not decoded for an icon: its kind's glyph is drawn instead. */
@@ -87,7 +88,9 @@ export function Browser({ listing }: { listing: Listing }) {
   const window = useWindowDimensions();
   const isWindowActive = platformWindow ? platformWindow.active : true;
 
-  const [rawSelection, setSelection] = useState<Selection>(NO_SELECTION);
+  const [rawSelection, setSelection] = useState<Selection>(() =>
+    selectionOnArrival(items, browser.cameFrom),
+  );
   const [search, setSearch] = useState('');
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<Item | null>(null);

@@ -28,8 +28,11 @@ function Folder({ uri }: { uri: string }) {
       <Redirect href={placeOf(parent, places) ? hrefFor({ kind: 'folder', uri: parent }) : '/'} />
     );
   }
+  // Each folder is its own pane, as Finder's: what was selected, searched or
+  // scrolled to in one does not carry into the next.
   return (
     <Browser
+      key={uri}
       listing={{
         location: { kind: 'folder', uri },
         title: place?.name ?? uriName(uri),

@@ -9,8 +9,11 @@ import {
   nextLocation,
   previousLocation,
   replaceCurrent,
+  selectionOnArrival,
 } from '@/lib/history';
 import type { Location } from '@/lib/items';
+import { NO_SELECTION } from '@/lib/selection';
+import { folder, local } from './fixtures';
 
 const HOME: Location = { kind: 'folder', uri: 'file:///home/ada' };
 const DOCUMENTS: Location = { kind: 'folder', uri: 'file:///home/ada/Documents' };
@@ -47,5 +50,30 @@ describe('history', () => {
     const history = replaceCurrent(go(historyAt(HOME), DOCUMENTS), HOME);
     expect(history.entries).toEqual([HOME, HOME]);
     expect(history.index).toBe(1);
+  });
+});
+
+describe('arriving', () => {
+  const items = [
+    folder('file:///home/ada/Desktop'),
+    folder('file:///home/ada/Documents'),
+    local('notes.md'),
+  ];
+
+  test('selects the folder the window just left, going up or back out of it', () => {
+    expect(selectionOnArrival(items, DOCUMENTS)).toEqual({
+      keys: ['file:///home/ada/Documents'],
+      anchor: 'file:///home/ada/Documents',
+      focus: 'file:///home/ada/Documents',
+    });
+    expect(
+      selectionOnArrival(items, { kind: 'folder', uri: 'file:///home/ada/Documents/' }).keys,
+    ).toEqual(['file:///home/ada/Documents']);
+  });
+
+  test('selects nothing coming from elsewhere, or arriving first', () => {
+    expect(selectionOnArrival(items, { kind: 'folder', uri: 'file:///srv' })).toEqual(NO_SELECTION);
+    expect(selectionOnArrival(items, { kind: 'cloud' })).toEqual(NO_SELECTION);
+    expect(selectionOnArrival(items, null)).toEqual(NO_SELECTION);
   });
 });
