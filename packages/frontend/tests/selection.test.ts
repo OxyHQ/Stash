@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
   bandSelect,
-  type Box,
   boxBetween,
+  DOUBLE_CLICK_MS,
+  isSecondClick,
+  NO_PRESS,
   clickSelect,
   focusEnd,
   keepShown,
@@ -94,13 +96,6 @@ describe('arrow keys', () => {
 });
 
 describe('the rubber band', () => {
-  const frames = new Map<string, Box>([
-    ['a', { x: 0, y: 0, width: 100, height: 100 }],
-    ['b', { x: 100, y: 0, width: 100, height: 100 }],
-    ['c', { x: 0, y: 100, width: 100, height: 100 }],
-  ]);
-  const order = ['a', 'b', 'c'];
-
   test('is the box between where it began and where it is', () => {
     expect(boxBetween({ x: 150, y: 50 }, { x: 50, y: 150 })).toEqual({
       x: 50,
@@ -111,21 +106,33 @@ describe('the rubber band', () => {
   });
 
   test('selects what it touches, alone, or flipping the selection with a modifier', () => {
-    const band = boxBetween({ x: 150, y: 50 }, { x: 50, y: 150 });
-    expect(bandSelect(NO_SELECTION, order, frames, band, false).keys).toEqual(['a', 'b', 'c']);
-    const thin = boxBetween({ x: 120, y: 10 }, { x: 180, y: 20 });
+    expect(bandSelect(NO_SELECTION, ['a', 'b', 'c'], false).keys).toEqual(['a', 'b', 'c']);
     const before = { keys: ['c'], anchor: 'c', focus: 'c' };
-    expect(bandSelect(before, order, frames, thin, false).keys).toEqual(['b']);
-    expect(bandSelect(before, order, frames, thin, true).keys).toEqual(['c', 'b']);
-    expect(bandSelect({ keys: ['b'], anchor: 'b', focus: 'b' }, order, frames, thin, true)).toEqual(
-      NO_SELECTION,
-    );
+    expect(bandSelect(before, ['b'], false).keys).toEqual(['b']);
+    expect(bandSelect(before, ['b'], true).keys).toEqual(['c', 'b']);
+    expect(bandSelect({ keys: ['b'], anchor: 'b', focus: 'b' }, ['b'], true)).toEqual(NO_SELECTION);
   });
 
   test('that touches nothing selects nothing', () => {
-    expect(
-      bandSelect(NO_SELECTION, order, frames, { x: 300, y: 300, width: 5, height: 5 }, false),
-    ).toEqual(NO_SELECTION);
+    expect(bandSelect(NO_SELECTION, [], false)).toEqual(NO_SELECTION);
+    expect(bandSelect({ keys: ['b'], anchor: 'b', focus: 'b' }, [], true).keys).toEqual(['b']);
+  });
+});
+
+describe('a double click', () => {
+  test("is a second press on the same item soon after the first, by the presses' own times", () => {
+    const first = { key: 'a', at: 1_000 };
+    expect(isSecondClick(first, 'a', 1_000 + DOUBLE_CLICK_MS - 1)).toBe(true);
+    expect(isSecondClick(first, 'a', 1_000 + DOUBLE_CLICK_MS)).toBe(false);
+    expect(isSecondClick(first, 'b', 1_100)).toBe(false);
+    expect(isSecondClick(NO_PRESS, 'a', 100)).toBe(false);
+  });
+
+  test('is still one when the first press took long to draw, since it is timed by the presses', () => {
+    // Pressed 180 ms apart, the second handled 900 ms after the first because
+    // the first press's drawing held the JavaScript thread.
+    const pressedAt = 5_000;
+    expect(isSecondClick({ key: 'a', at: pressedAt }, 'a', pressedAt + 180)).toBe(true);
   });
 });
 
