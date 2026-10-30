@@ -5,6 +5,7 @@ import {
   DOUBLE_CLICK_MS,
   isSecondClick,
   NO_PRESS,
+  pressTime,
   clickSelect,
   focusEnd,
   keepShown,
@@ -120,6 +121,20 @@ describe('the rubber band', () => {
 });
 
 describe('a double click', () => {
+  test('is timed by the device when the platform carries its time, else by the event', () => {
+    expect(pressTime({ timeStamp: 9_000, nativeEvent: { timestamp: 1_200 } })).toBe(1_200);
+    expect(pressTime({ timeStamp: 9_000, nativeEvent: {} })).toBe(9_000);
+    expect(pressTime({ timeStamp: 9_000, nativeEvent: { timestamp: 0 } })).toBe(9_000);
+    // Two presses 180 ms apart by the device, handled 700 ms apart under load.
+    const first = {
+      key: 'a',
+      at: pressTime({ timeStamp: 10_000, nativeEvent: { timestamp: 500 } }),
+    };
+    expect(
+      isSecondClick(first, 'a', pressTime({ timeStamp: 10_700, nativeEvent: { timestamp: 680 } })),
+    ).toBe(true);
+  });
+
   test("is a second press on the same item soon after the first, by the presses' own times", () => {
     const first = { key: 'a', at: 1_000 };
     expect(isSecondClick(first, 'a', 1_000 + DOUBLE_CLICK_MS - 1)).toBe(true);

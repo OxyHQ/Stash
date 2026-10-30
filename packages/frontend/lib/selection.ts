@@ -183,6 +183,21 @@ export interface LastPress {
 export const NO_PRESS: LastPress = { key: null, at: 0 };
 
 /**
+ * When a press happened, by its own clock: the device's time the platform
+ * carries (`nativeEvent.timestamp`, as React Native has it on Android and
+ * iOS), or else the time the platform made the event (`timeStamp`, the DOM
+ * event's on the web). Never when JavaScript got round to it: under load
+ * that is late by however long the last frame took.
+ */
+export function pressTime(event: { timeStamp: number; nativeEvent: object }): number {
+  const { nativeEvent } = event;
+  const timestamp = 'timestamp' in nativeEvent ? nativeEvent.timestamp : undefined;
+  return typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0
+    ? timestamp
+    : event.timeStamp;
+}
+
+/**
  * Whether a press on `key` at `at` (the press's own time, as the event carries
  * it, not when it was handled) is the second of a double click.
  */
