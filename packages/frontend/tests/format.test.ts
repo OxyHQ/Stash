@@ -65,3 +65,37 @@ describe('the words', () => {
     expect(english.selected(2, 5)).toBe('2 of 5 selected');
   });
 });
+
+describe('a list of rows', () => {
+  test('makes each formatter once per language, however many rows it formats', () => {
+    const words = stringsFor('fr');
+    const made = { dates: 0, numbers: 0 };
+    const { DateTimeFormat, NumberFormat } = Intl;
+    const countingDates = new Proxy(DateTimeFormat, {
+      construct(target, args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+        made.dates += 1;
+        return new target(...args);
+      },
+    });
+    const countingNumbers = new Proxy(NumberFormat, {
+      construct(target, args: ConstructorParameters<typeof Intl.NumberFormat>) {
+        made.numbers += 1;
+        return new target(...args);
+      },
+    });
+    Intl.DateTimeFormat = countingDates;
+    Intl.NumberFormat = countingNumbers;
+    try {
+      const now = new Date(2026, 9, 30, 15, 0).getTime();
+      for (let row = 0; row < 500; row += 1) {
+        formatDate(new Date(2025, 0, 1 + row).getTime(), now, 'fr-FR', words);
+        formatSize(1_500 + row * 1_000, words.units, 'fr-FR');
+      }
+    } finally {
+      Intl.DateTimeFormat = DateTimeFormat;
+      Intl.NumberFormat = NumberFormat;
+    }
+    expect(made.dates).toBeLessThanOrEqual(2);
+    expect(made.numbers).toBeLessThanOrEqual(2);
+  });
+});
