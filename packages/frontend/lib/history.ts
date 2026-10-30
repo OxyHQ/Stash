@@ -3,7 +3,9 @@
  * route says where the window is; this follows it, so a press on Back, the
  * browser's own back and a phone's back gesture all agree.
  */
-import { type Location, sameLocation } from '@/lib/items';
+import { type Item, type Location, sameLocation } from '@/lib/items';
+import { isSameUri } from '@/lib/local-places';
+import { NO_SELECTION, type Selection, selectOnly } from '@/lib/selection';
 
 export interface History {
   readonly entries: readonly Location[];
@@ -61,4 +63,15 @@ export function replaceCurrent(history: History, location: Location): History {
   const entries = history.entries.slice();
   entries[history.index] = location;
   return { entries, index: history.index };
+}
+
+/**
+ * What is selected as the window arrives somewhere: the folder it just left,
+ * when that is one of the items here (going up, or back out of it), as Finder
+ * selects it, so the keys go on from where the person was.
+ */
+export function selectionOnArrival(items: readonly Item[], cameFrom: Location | null): Selection {
+  if (cameFrom?.kind !== 'folder') return NO_SELECTION;
+  const left = items.find((item) => item.source === 'local' && isSameUri(item.uri, cameFrom.uri));
+  return left ? selectOnly(left.key) : NO_SELECTION;
 }
