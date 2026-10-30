@@ -22,6 +22,12 @@ export interface ItemCellProps {
   top: number;
   width: number;
   height: number;
+  /**
+   * Where it is stacked: a row above the rows after it, so a selected name
+   * shown whole runs over the row below. Fixed by its place, never by the
+   * selection, so selecting redraws only the two items it moved between.
+   */
+  layer: number;
   isSelected: boolean;
   isWindowActive: boolean;
   isDropTarget: boolean;
@@ -39,6 +45,7 @@ export const ItemCell = memo(function ItemCell({
   top,
   width,
   height,
+  layer,
   isSelected,
   isWindowActive,
   isDropTarget,
@@ -82,9 +89,8 @@ export const ItemCell = memo(function ItemCell({
   return (
     <View
       {...accessibility}
-      // A selected name shown whole may run over the row below: it is drawn above it.
-      className={`absolute select-none items-center gap-1 pt-1.5 ${isSelected ? 'z-10' : ''}`}
-      style={{ left, top, width, height }}
+      className="absolute select-none items-center gap-1 pt-1.5"
+      style={{ left, top, width, height, zIndex: layer }}
     >
       <View
         className={
