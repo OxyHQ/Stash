@@ -77,6 +77,8 @@ describe('arrow keys', () => {
     selection = moveFocus(selection, order, 3);
     expect(selection.keys).toEqual(['g']);
     expect(moveFocus(selection, order, 3).keys).toEqual(['g']);
+    // From the row above the last, a full row down passes the end: the last item.
+    expect(moveFocus({ keys: ['e'], anchor: 'e', focus: 'e' }, order, 3).keys).toEqual(['g']);
     expect(moveFocus({ keys: ['b'], anchor: 'b', focus: 'b' }, order, -3).keys).toEqual(['a']);
   });
 

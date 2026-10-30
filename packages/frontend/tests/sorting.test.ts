@@ -27,6 +27,16 @@ describe('sorting', () => {
     expect(names('kind', 'ascending')).toEqual(['Pictures', 'a.png', 'b.txt', 'c.txt']);
   });
 
+  test('puts folders before even an empty file by size', () => {
+    const withEmpty = [
+      local('a.txt', { size: 0 }),
+      local('Zed', { isFolder: true, size: null }),
+    ];
+    expect(
+      sortItems(withEmpty, { column: 'size', direction: 'ascending' }).map((item) => item.name),
+    ).toEqual(['Zed', 'a.txt']);
+  });
+
   test('never changes the items it was given', () => {
     sortItems(items, NAME_ORDER);
     expect(items[0]?.name).toBe('b.txt');

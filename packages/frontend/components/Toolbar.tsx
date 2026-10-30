@@ -4,7 +4,7 @@
  * the window's chrome where the platform has windows: a press on it that no
  * control takes moves the window.
  */
-import { AppShellMenuButton, useAppShell } from '@oxy.so/bloom/app-shell';
+import { AppShellMenuButton, useAppShell, useAppShellPanel } from '@oxy.so/bloom/app-shell';
 import { Breadcrumb, BreadcrumbItem } from '@oxy.so/bloom/breadcrumb';
 import { Button } from '@oxy.so/bloom/button';
 import { ButtonGroup, ButtonGroupItem } from '@oxy.so/bloom/button-group';
@@ -22,6 +22,7 @@ import { Text } from '@oxy.so/bloom/typography';
 import { useWindowControlsRoom, WindowDragRegion } from '@oxy.so/bloom/window';
 import type { ComponentType } from 'react';
 import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ViewMode } from '@/components/BrowserProvider';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -74,6 +75,9 @@ export function Toolbar({
   // With the sidebar hidden the toolbar holds the window's corner, and keeps the controls' room.
   const room = useWindowControlsRoom();
   const { navigationDock } = useAppShell();
+  // A pane drawn edge to edge (a phone's) starts at the screen's top, under the status bar.
+  const panel = useAppShellPanel();
+  const insets = useSafeAreaInsets();
   const isCompact = width > 0 && width < COMPACT_BELOW;
   const searchField = (
     <Search
@@ -87,7 +91,7 @@ export function Toolbar({
     />
   );
   return (
-    <View>
+    <View style={{ paddingTop: panel.framed ? 0 : insets.top }}>
       <WindowDragRegion
         accessibilityRole="toolbar"
         className="h-13 flex-row items-center gap-2.5 pe-2.5"

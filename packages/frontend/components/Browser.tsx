@@ -192,7 +192,7 @@ export function Browser({ listing }: { listing: Listing }) {
   };
 
   useBrowserKeys({
-    isEnabled: (platformWindow ? platformWindow.active : true) && confirm === null,
+    isEnabled: isWindowActive && confirm === null,
     viewMode,
     columns: gridColumns(width, listing.layout),
     shown,
@@ -312,7 +312,6 @@ export function Browser({ listing }: { listing: Listing }) {
           />
         }
         emptyState={emptyState}
-        footer={null}
         onWidthChange={setWidth}
         onEndReached={listing.onEndReached}
       />

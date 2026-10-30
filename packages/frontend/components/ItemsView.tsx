@@ -104,7 +104,6 @@ export interface ItemsViewProps {
   itemMenu: (item: Item) => ReactNode;
   backgroundMenu: ReactNode;
   emptyState: ReactNode;
-  footer: ReactNode;
   onWidthChange: (width: number) => void;
   onEndReached?: () => void;
 }
@@ -134,7 +133,6 @@ export function ItemsView({
   itemMenu,
   backgroundMenu,
   emptyState,
-  footer,
   onWidthChange,
   onEndReached,
 }: ItemsViewProps) {
@@ -488,7 +486,6 @@ export function ItemsView({
                   {emptyState}
                 </View>
               ) : null}
-              {footer}
               {band ? (
                 <View
                   pointerEvents="none"

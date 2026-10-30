@@ -45,6 +45,8 @@ describe('kinds', () => {
     expect(kindOf({ name: '.bashrc', isFolder: false, mime: null })).toBe('file');
     expect(kindOf({ name: 'archive.tar.gz', isFolder: false, mime: null })).toBe('archive');
     expect(kindOf({ name: 'x', isFolder: false, mime: 'application/pdf' })).toBe('pdf');
+    // The type Oxy Files read from the bytes wins over a name that says otherwise.
+    expect(kindOf({ name: 'photo.txt', isFolder: false, mime: 'image/png' })).toBe('image');
   });
 
   test('give an upload its MIME type from its name', () => {
