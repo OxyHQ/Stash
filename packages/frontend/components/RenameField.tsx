@@ -50,7 +50,7 @@ export function RenameField({
       className={
         isCentred
           ? 'min-w-24 max-w-[100px] rounded border-2 outline-none border-primary bg-background px-1 py-px text-center text-xs text-foreground'
-          : 'min-w-30 flex-1 rounded border-2 outline-none border-primary bg-background px-1 py-px text-[13px] text-foreground'
+          : 'ms-2 min-w-30 flex-1 rounded border-2 outline-none border-primary bg-background px-1 py-px text-[13px] text-foreground'
       }
     />
   );

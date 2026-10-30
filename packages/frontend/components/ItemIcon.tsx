@@ -58,22 +58,24 @@ function PageArt({ size, kind }: { size: number; kind: Kind }) {
   const edge = theme.isDark ? '#5a5a62' : '#c9c9cf';
   // The page's edge stays a pixel wide however small the icon is drawn (a list's).
   const stroke = Math.max(1.2, PAGE_VIEWBOX / size);
+  const page = (
+    <Svg width={size} height={size} viewBox={`0 0 ${PAGE_VIEWBOX} ${PAGE_VIEWBOX}`}>
+      <Path
+        d="M14 4h26l14 14v40a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+        fill={paper}
+        stroke={edge}
+        strokeWidth={stroke}
+      />
+      <Path d="M40 4v12a2 2 0 0 0 2 2h12" fill="none" stroke={edge} strokeWidth={stroke} />
+    </Svg>
+  );
+  if (size < GLYPH_FROM_SIZE) return page;
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox={`0 0 ${PAGE_VIEWBOX} ${PAGE_VIEWBOX}`}>
-        <Path
-          d="M14 4h26l14 14v40a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
-          fill={paper}
-          stroke={edge}
-          strokeWidth={stroke}
-        />
-        <Path d="M40 4v12a2 2 0 0 0 2 2h12" fill="none" stroke={edge} strokeWidth={stroke} />
-      </Svg>
-      {size >= GLYPH_FROM_SIZE ? (
-        <View className="absolute inset-x-0 items-center" style={{ top: size * 0.4 }}>
-          <Glyph width={glyph} height={glyph} fill={theme.colors.textSecondary} />
-        </View>
-      ) : null}
+      {page}
+      <View className="absolute inset-x-0 items-center" style={{ top: size * 0.4 }}>
+        <Glyph width={glyph} height={glyph} fill={theme.colors.textSecondary} />
+      </View>
     </View>
   );
 }
@@ -125,14 +127,12 @@ export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false }: ItemIc
   if (kind === 'album') return <AlbumArt size={size} coverUrl={thumbnailUrl} />;
   if (thumbnailUrl && (kind === 'image' || kind === 'video')) {
     return (
-      <View className="items-center justify-center" style={{ width: size, height: size }}>
-        <Image
-          source={{ uri: thumbnailUrl }}
-          style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
-          resizeMode={isCropped ? 'cover' : 'contain'}
-          accessible={false}
-        />
-      </View>
+      <Image
+        source={{ uri: thumbnailUrl }}
+        style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
+        resizeMode={isCropped ? 'cover' : 'contain'}
+        accessible={false}
+      />
     );
   }
   return <PageArt size={size} kind={kind} />;
