@@ -331,30 +331,36 @@ export function Browser({ listing }: { listing: Listing }) {
     }
   })();
 
+  // Where the platform has a menu bar the menus are described to it and draw
+  // nothing here; elsewhere a wide window draws them above the toolbar.
+  const menus = (
+    <BrowserMenus
+      commands={commands}
+      location={location}
+      places={places}
+      viewMode={viewMode}
+      onViewMode={(mode) => browser.setViewMode(location, mode)}
+      order={order}
+      onSortColumn={(column) =>
+        browser.setOrder(location, order.column === column ? order : sortBy(order, column))
+      }
+      isShowingHidden={browser.isShowingHidden}
+      onShowingHidden={browser.setShowingHidden}
+      canGoBack={browser.canGoBack}
+      canGoForward={browser.canGoForward}
+      onBack={browser.goBack}
+      onForward={browser.goForward}
+      onEnclosing={enclosing ? () => browser.navigate(enclosing) : null}
+      onGo={browser.navigate}
+    />
+  );
+
   return (
     <View className="flex-1" testID="browser">
-      {platformMenuBar || window.width >= MENU_BAR_FROM ? (
-        <View className="flex-row px-2 pt-2">
-          <BrowserMenus
-            commands={commands}
-            location={location}
-            places={places}
-            viewMode={viewMode}
-            onViewMode={(mode) => browser.setViewMode(location, mode)}
-            order={order}
-            onSortColumn={(column) =>
-              browser.setOrder(location, order.column === column ? order : sortBy(order, column))
-            }
-            isShowingHidden={browser.isShowingHidden}
-            onShowingHidden={browser.setShowingHidden}
-            canGoBack={browser.canGoBack}
-            canGoForward={browser.canGoForward}
-            onBack={browser.goBack}
-            onForward={browser.goForward}
-            onEnclosing={enclosing ? () => browser.navigate(enclosing) : null}
-            onGo={browser.navigate}
-          />
-        </View>
+      {platformMenuBar ? (
+        menus
+      ) : window.width >= MENU_BAR_FROM ? (
+        <View className="flex-row px-2 pt-2">{menus}</View>
       ) : null}
       <Toolbar
         title={listing.title}

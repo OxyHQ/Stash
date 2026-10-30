@@ -13,9 +13,12 @@ import { type LocalItem, localItem } from '@/lib/items';
 import { type NameProblem, nameProblem } from '@/lib/names';
 import type { FileProblem } from '@/lib/strings';
 
-/** Whether this platform implements `expo-file-system` (its native module is there). */
+/** The platform implements `expo-file-system` (its native module is there); it never changes while Stash runs. */
+const IS_AVAILABLE = requireOptionalNativeModule('FileSystem') !== null;
+
+/** Whether this platform has files of its own that Stash can browse. */
 export function hasLocalFiles(): boolean {
-  return requireOptionalNativeModule('FileSystem') !== null;
+  return IS_AVAILABLE;
 }
 
 /** The folder `expo-file-system` gives Stash on this device, for a platform with no places of its own. */
