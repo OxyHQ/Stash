@@ -191,6 +191,7 @@ export function ItemsView({
   const drawnBottom = scrollStep * stepHeight + screen * (1 + OVERSCAN_SCREENS);
   const drawn = itemsBetween(geometry, items.length, drawnTop, drawnBottom);
   const height = contentHeight(geometry, items.length);
+  const rowCount = Math.ceil(items.length / geometry.columns);
   const rename: RenameHandlers = { onText: onRenameText, onDone: onRenameDone };
 
   // An item's accessibility action calls whatever the browser does now; the
@@ -486,6 +487,7 @@ export function ItemsView({
         top={frame.y}
         width={frame.width}
         height={frame.height}
+        layer={rowCount - Math.floor(index / geometry.columns)}
         isSelected={isItemSelected}
         isWindowActive={isWindowActive}
         isDropTarget={isDropTarget}
