@@ -1,39 +1,66 @@
-/** An item in a grid: Finder's icon over its name, or Photos' picture filling its square. */
+/**
+ * An item in a grid: Finder's icon over its name, or Photos' picture filling
+ * its square. It draws itself where the grid places it and again only when
+ * something it shows changes.
+ *
+ * A name runs to two lines, cut in the middle where it is longer, as Finder
+ * cuts one; selected, it is shown whole, over the row below if it must be.
+ */
 import { Text } from '@oxy.so/bloom/typography';
-import { View } from 'react-native';
+import { memo } from 'react';
+import { type AccessibilityActionEvent, type AccessibilityActionInfo, View } from 'react-native';
 import { ItemIcon } from '@/components/ItemIcon';
-import { ICON_CELL, type ItemsLayout } from '@/components/ItemsView';
+import type { RenameHandlers } from '@/components/ItemRow';
 import { RenameField } from '@/components/RenameField';
 import { type Item, itemKind } from '@/lib/items';
+import { ICON_CELL, type ItemsLayout } from '@/lib/items-layout';
 
-export function ItemCell({
-  item,
-  layout,
-  photoSize,
-  isSelected,
-  isWindowActive,
-  isDropTarget,
-  isRenaming,
-  onRenameText,
-  onRenameDone,
-  thumbnailUrl,
-}: {
+export interface ItemCellProps {
   item: Item;
   layout: ItemsLayout;
-  photoSize: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
   isSelected: boolean;
   isWindowActive: boolean;
   isDropTarget: boolean;
-  isRenaming: boolean;
-  onRenameText: (text: string) => void;
-  onRenameDone: () => void;
+  /** The name's field, while the name is being edited. */
+  rename: RenameHandlers | null;
   thumbnailUrl: string | null;
-}) {
+  accessibilityActions: readonly AccessibilityActionInfo[];
+  onAccessibilityAction: (item: Item, action: string) => void;
+}
+
+export const ItemCell = memo(function ItemCell({
+  item,
+  layout,
+  left,
+  top,
+  width,
+  height,
+  isSelected,
+  isWindowActive,
+  isDropTarget,
+  rename,
+  thumbnailUrl,
+  accessibilityActions,
+  onAccessibilityAction,
+}: ItemCellProps) {
   const kind = itemKind(item);
+  const accessibility = {
+    testID: `item-${item.name}`,
+    accessibilityRole: 'listitem' as const,
+    accessibilityLabel: item.name,
+    'aria-selected': isSelected,
+    accessibilityActions,
+    onAccessibilityAction: (event: AccessibilityActionEvent) =>
+      onAccessibilityAction(item, event.nativeEvent.actionName),
+  };
   if (layout === 'photos') {
     return (
-      <View style={{ width: photoSize, height: photoSize }} className="bg-muted">
-        <ItemIcon kind={kind} size={photoSize} thumbnailUrl={thumbnailUrl} isCropped />
+      <View {...accessibility} className="absolute bg-muted" style={{ left, top, width, height }}>
+        <ItemIcon kind={kind} size={width} thumbnailUrl={thumbnailUrl} isCropped />
         {isSelected || isDropTarget ? (
           <View
             pointerEvents="none"
@@ -52,8 +79,10 @@ export function ItemCell({
   const textClass = isSelected && isWindowActive ? 'text-primary-foreground' : 'text-foreground';
   return (
     <View
-      className="select-none items-center gap-1 pt-1.5"
-      style={{ width: ICON_CELL.width, height: ICON_CELL.height }}
+      {...accessibility}
+      // A selected name shown whole may run over the row below: it is drawn above it.
+      className={`absolute select-none items-center gap-1 pt-1.5 ${isSelected ? 'z-10' : ''}`}
+      style={{ left, top, width, height }}
     >
       <View
         className={
@@ -66,19 +95,20 @@ export function ItemCell({
       >
         <ItemIcon kind={kind} size={ICON_CELL.icon} thumbnailUrl={thumbnailUrl} />
       </View>
-      {isRenaming && item.source === 'local' ? (
+      {rename && item.source === 'local' ? (
         <RenameField
           name={item.name}
           isFolder={item.isFolder}
           isCentred
-          onText={onRenameText}
-          onDone={onRenameDone}
+          onText={rename.onText}
+          onDone={rename.onDone}
         />
       ) : (
         <View className={`max-w-24 rounded-[5px] px-1.5 py-px ${labelClass}`}>
           <Text
             variant="caption-1-regular"
-            numberOfLines={2}
+            numberOfLines={isSelected ? undefined : 2}
+            ellipsizeMode="middle"
             selectable={false}
             className={`text-center ${textClass}`}
           >
@@ -88,4 +118,4 @@ export function ItemCell({
       )}
     </View>
   );
-}
+});
