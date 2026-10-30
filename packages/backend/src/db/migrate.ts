@@ -12,7 +12,12 @@
  * reports what would be applied and writes nothing.
  */
 
-import { MIGRATION_RUNS, type MigrationRun, readTargetDatabase, runMigrations } from '@oxy.so/db/migrate';
+import {
+  MIGRATION_RUNS,
+  type MigrationRun,
+  readTargetDatabase,
+  runMigrations,
+} from '@oxy.so/db/migrate';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { MIGRATIONS_FOLDER } from './migrationsFolder';
