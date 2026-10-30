@@ -55,6 +55,11 @@ export function listFolder(uri: string): LocalItem[] {
   return new Directory(uri).list().map(itemOf);
 }
 
+/** Whether a folder is there. */
+export function folderExists(uri: string): boolean {
+  return new Directory(uri).exists;
+}
+
 function namesIn(folderUri: string): string[] {
   return new Directory(folderUri).list().map((entry) => entry.name);
 }

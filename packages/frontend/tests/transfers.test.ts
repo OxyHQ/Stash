@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { overallProgress, planDownloads, planUploads } from '@/lib/transfers';
+import { downloadableOf, overallProgress, planDownloads, planUploads } from '@/lib/transfers';
 import { cloud, folder, local } from './fixtures';
 
 describe('uploads', () => {
@@ -58,5 +58,31 @@ describe('progress', () => {
       ]),
     ).toBe(0.5);
     expect(overallProgress([])).toBe(0);
+  });
+});
+
+describe('what downloads', () => {
+  test('an Oxy Files file as itself, an album photo by its date with its extension, nothing else', () => {
+    const file = cloud('notes.md');
+    expect(downloadableOf(file)).toBe(file);
+    const photo = {
+      source: 'album-photo',
+      key: 'album-item:i1',
+      albumId: 'al1',
+      itemId: 'i1',
+      assetId: 'a1',
+      name: '2 Jan 2026',
+      isFolder: false,
+      size: null,
+      modifiedAt: 1,
+      isHidden: false,
+      mime: 'image/jpeg',
+      width: 1,
+      height: 1,
+      seeds: [],
+    } as const;
+    expect(downloadableOf(photo)).toEqual({ assetId: 'a1', name: '2 Jan 2026.jpg', size: null });
+    expect(downloadableOf({ ...photo, mime: 'application/x-unknown' })?.name).toBe('2 Jan 2026');
+    expect(downloadableOf(local('a.txt'))).toBeNull();
   });
 });

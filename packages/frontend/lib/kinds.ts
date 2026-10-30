@@ -166,3 +166,24 @@ export function mimeForName(name: string): string {
       return 'application/octet-stream';
   }
 }
+
+const EXTENSION_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/avif': 'avif',
+  'image/tiff': 'tiff',
+  'image/svg+xml': 'svg',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
+};
+
+/** The extension a file of a MIME type takes, for a name that has none; none for a type Stash does not know. */
+export function extensionForMime(mime: string | null): string {
+  if (!mime) return '';
+  return EXTENSION_BY_MIME[mime.split(';')[0]?.trim().toLowerCase() ?? ''] ?? '';
+}

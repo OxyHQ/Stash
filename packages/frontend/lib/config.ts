@@ -8,3 +8,10 @@ export const STASH_API_URL = process.env.EXPO_PUBLIC_STASH_API_URL ?? 'https://a
 
 /** Stash's Oxy client id (its ApplicationCredential publicKey). */
 export const OXY_CLIENT_ID = process.env.EXPO_PUBLIC_OXY_CLIENT_ID ?? '';
+
+/**
+ * Stash's Oxy application id: the application a photo is linked to when it
+ * joins an album (`oxy.assets.link`), which is what lets Stash's backend read
+ * it (oxy ADR 0021).
+ */
+export const STASH_APPLICATION_ID = process.env.EXPO_PUBLIC_STASH_APPLICATION_ID ?? '';

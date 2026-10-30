@@ -3,8 +3,8 @@
  * before any byte moves: which items go, under which names, and what is left
  * out and why.
  */
-import type { CloudItem, LocalItem } from '@/lib/items';
-import { mimeForName } from '@/lib/kinds';
+import type { CloudItem, Item, LocalItem } from '@/lib/items';
+import { extensionForMime, extensionOf, mimeForName } from '@/lib/kinds';
 import { freeFileName } from '@/lib/names';
 
 /** One local file to upload, as `oxy.assets.upload` takes a file on a native platform. */
@@ -39,6 +39,22 @@ export function planUploads(items: readonly LocalItem[]): UploadPlan {
   return { uploads, skippedFolders };
 }
 
+/** What a download needs of an item: its asset, its name and its size. */
+export type Downloadable = Pick<CloudItem, 'assetId' | 'name' | 'size'>;
+
+/**
+ * What an item downloads as: an Oxy Files file as itself, an album's photo
+ * under its date with the extension its type takes. None for an item with no
+ * asset (this device's, an album).
+ */
+export function downloadableOf(item: Item): Downloadable | null {
+  if (item.source === 'cloud') return item;
+  if (item.source !== 'album-photo') return null;
+  const extension = extensionForMime(item.mime);
+  const name = extension && !extensionOf(item.name) ? `${item.name}.${extension}` : item.name;
+  return { assetId: item.assetId, name, size: item.size };
+}
+
 /** One Oxy Files asset to download, and the name it will have in the folder. */
 export interface DownloadStep {
   assetId: string;
@@ -51,7 +67,7 @@ export interface DownloadStep {
  * same download), so nothing there is ever replaced.
  */
 export function planDownloads(
-  items: readonly CloudItem[],
+  items: readonly Downloadable[],
   taken: readonly string[],
 ): DownloadStep[] {
   const names = taken.slice();
