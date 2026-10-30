@@ -81,28 +81,26 @@ export const ItemRow = memo(function ItemRow({
       className={`absolute inset-x-1.5 select-none flex-row items-center rounded-md px-2 ${rowClass}`}
       style={{ top, height }}
     >
-      <View className="min-w-0 flex-1 flex-row items-center gap-2">
-        <ItemIcon kind={kind} size={iconSize} thumbnailUrl={thumbnailUrl} isCropped />
-        {rename && item.source === 'local' ? (
-          <RenameField
-            name={item.name}
-            isFolder={item.isFolder}
-            isCentred={false}
-            onText={rename.onText}
-            onDone={rename.onDone}
-          />
-        ) : (
-          <Text
-            variant="body-2-regular"
-            numberOfLines={1}
-            ellipsizeMode="middle"
-            selectable={false}
-            className={`flex-1 ${textClass}`}
-          >
-            {item.name}
-          </Text>
-        )}
-      </View>
+      <ItemIcon kind={kind} size={iconSize} thumbnailUrl={thumbnailUrl} isCropped />
+      {rename && item.source === 'local' ? (
+        <RenameField
+          name={item.name}
+          isFolder={item.isFolder}
+          isCentred={false}
+          onText={rename.onText}
+          onDone={rename.onDone}
+        />
+      ) : (
+        <Text
+          variant="body-2-regular"
+          numberOfLines={1}
+          ellipsizeMode="middle"
+          selectable={false}
+          className={`min-w-0 flex-1 ps-2 ${textClass}`}
+        >
+          {item.name}
+        </Text>
+      )}
       {hasOriginColumn ? (
         <Text
           variant="body-2-regular"
