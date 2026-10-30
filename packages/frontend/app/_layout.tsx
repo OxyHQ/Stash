@@ -1,0 +1,43 @@
+import '../global.css';
+
+import { BloomProvider } from '@oxy.so/bloom/provider';
+import { OxyProvider } from '@oxy.so/services/ui/client';
+import { Slot } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { OXY_CLIENT_ID } from '@/lib/config';
+import { setLocale } from '@/lib/locale-store';
+import { oxyServices } from '@/lib/oxy';
+import { queryClient } from '@/lib/query-client';
+import { FALLBACK_LOCALE, SUPPORTED_LOCALES } from '@/lib/strings';
+
+/**
+ * Stash's providers. The platform's adapter (OxyOS's windows, menu bar and the
+ * person's places and Trash) is registered around this by the runtime that
+ * runs Stash; Stash's own BloomProvider keeps it. Oxy resolves the person's
+ * language and Stash speaks it.
+ */
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <BloomProvider>
+          <OxyProvider
+            oxyServices={oxyServices}
+            clientId={OXY_CLIENT_ID}
+            queryClient={queryClient}
+            language={{
+              supportedLocales: SUPPORTED_LOCALES,
+              fallbackLocale: FALLBACK_LOCALE,
+              onChange: setLocale,
+              onError: (error, locale) =>
+                console.warn('Stash could not follow the language Oxy resolved', { locale, error }),
+            }}
+          >
+            <Slot />
+          </OxyProvider>
+        </BloomProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}

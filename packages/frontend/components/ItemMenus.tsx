@@ -1,0 +1,154 @@
+/**
+ * The context menus: an item's (for the selection it is in) and the
+ * background's (for the place itself), with the rows the menu bar has for
+ * them.
+ */
+import {
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+} from '@oxy.so/bloom/context-menu';
+import type { ViewMode } from '@/components/BrowserProvider';
+import type { Commands } from '@/hooks/use-commands';
+import { useLocale } from '@/hooks/use-locale';
+import type { Item, Location } from '@/lib/items';
+
+export function ItemMenuRows({ item, commands }: { item: Item; commands: Commands }) {
+  const { strings } = useLocale();
+  if (item.source === 'local-trash' || item.source === 'cloud-trash') {
+    return (
+      <>
+        <ContextMenuItem onPress={commands.putBack.run}>{strings.menus.putBack}</ContextMenuItem>
+        <ContextMenuItem tone="danger" onPress={commands.eraseNow.run}>
+          {strings.menus.deleteImmediately}
+        </ContextMenuItem>
+      </>
+    );
+  }
+  const enabledAlbums = commands.addToAlbum.filter(({ command }) => command.isEnabled);
+  return (
+    <>
+      <ContextMenuItem onPress={() => commands.openItem(item)}>
+        {strings.menus.open}
+      </ContextMenuItem>
+      {commands.preview.isEnabled ? (
+        <ContextMenuItem onPress={commands.preview.run}>{strings.menus.preview}</ContextMenuItem>
+      ) : null}
+      <ContextMenuSeparator />
+      {commands.rename.isEnabled ? (
+        <ContextMenuItem onPress={commands.rename.run}>{strings.menus.rename}</ContextMenuItem>
+      ) : null}
+      {commands.upload.isEnabled ? (
+        <ContextMenuItem onPress={commands.upload.run}>{strings.menus.upload}</ContextMenuItem>
+      ) : null}
+      {commands.download.isEnabled ? (
+        <ContextMenuItem onPress={commands.download.run}>{strings.menus.download}</ContextMenuItem>
+      ) : null}
+      {commands.download.isEnabled &&
+      commands.downloadTo.some(({ command }) => command.isEnabled) ? (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>{strings.menus.downloadTo}</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {commands.downloadTo.map(({ place, command }) => (
+              <ContextMenuItem key={place.uri} onPress={command.run}>
+                {place.name}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      ) : null}
+      {enabledAlbums.length > 0 ? (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>{strings.menus.addToAlbum}</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {enabledAlbums.map(({ album, command }) => (
+              <ContextMenuItem key={album.id} onPress={command.run}>
+                {album.name}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      ) : null}
+      {commands.removeFromAlbum.isEnabled ? (
+        <ContextMenuItem onPress={commands.removeFromAlbum.run}>
+          {strings.menus.removeFromAlbum}
+        </ContextMenuItem>
+      ) : null}
+      {item.source === 'album' ? (
+        <>
+          <ContextMenuItem onPress={commands.renameAlbum.run}>
+            {strings.menus.renameAlbum}
+          </ContextMenuItem>
+          <ContextMenuItem tone="danger" onPress={commands.deleteAlbum.run}>
+            {strings.menus.deleteAlbum}
+          </ContextMenuItem>
+        </>
+      ) : null}
+      {commands.moveToTrash.isEnabled ? (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onPress={commands.moveToTrash.run}>
+            {strings.menus.moveToTrash}
+          </ContextMenuItem>
+        </>
+      ) : null}
+      {commands.deleteForGood.isEnabled ? (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem tone="danger" onPress={commands.deleteForGood.run}>
+            {strings.menus.deleteForGood}
+          </ContextMenuItem>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+export function BackgroundMenuRows({
+  commands,
+  location,
+  viewMode,
+  onViewMode,
+}: {
+  commands: Commands;
+  location: Location;
+  viewMode: ViewMode;
+  onViewMode: (mode: ViewMode) => void;
+}) {
+  const { strings } = useLocale();
+  return (
+    <>
+      {commands.newFolder.isEnabled ? (
+        <ContextMenuItem onPress={commands.newFolder.run}>
+          {strings.menus.newFolder}
+        </ContextMenuItem>
+      ) : null}
+      {location.kind === 'albums' && commands.newAlbum.isEnabled ? (
+        <ContextMenuItem onPress={commands.newAlbum.run}>{strings.menus.newAlbum}</ContextMenuItem>
+      ) : null}
+      {location.kind === 'cloud' && commands.uploadPicked.isEnabled ? (
+        <ContextMenuItem onPress={commands.uploadPicked.run}>
+          {strings.menus.uploadFiles}
+        </ContextMenuItem>
+      ) : null}
+      {location.kind === 'trash' ? (
+        <ContextMenuItem
+          tone="danger"
+          disabled={!commands.emptyTrash.isEnabled}
+          onPress={commands.emptyTrash.run}
+        >
+          {strings.menus.emptyTrash}
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuSeparator />
+      <ContextMenuItem onPress={() => onViewMode(viewMode === 'icons' ? 'list' : 'icons')}>
+        {`${strings.view} ${viewMode === 'icons' ? strings.asList : strings.asIcons}`}
+      </ContextMenuItem>
+      <ContextMenuItem disabled={!commands.selectAll.isEnabled} onPress={commands.selectAll.run}>
+        {strings.menus.selectAll}
+      </ContextMenuItem>
+    </>
+  );
+}

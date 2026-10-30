@@ -1,0 +1,106 @@
+/**
+ * What this device's folders hold, kept for the views that show them and
+ * read with `useSyncExternalStore`. A folder is listed when a view first
+ * shows it and again whenever the file system says it changed
+ * (`Directory.watch`) or Stash changed it; its state keeps its identity while
+ * what it holds is the same, so a burst of watched changes redraws nothing.
+ */
+import type { LocalItem } from '@/lib/items';
+import { folderExists, listFolder, watchFolder } from '@/lib/local-files';
+import { normalizeUri } from '@/lib/local-places';
+
+export type FolderState =
+  | { status: 'ready'; items: readonly LocalItem[] }
+  /** The folder is not there (gone, or never was). */
+  | { status: 'missing' }
+  /** It is there but cannot be read. */
+  | { status: 'unreadable' };
+
+interface Folder {
+  /** The URI it is read at, as the first view to show it wrote it. */
+  uri: string;
+  state: FolderState;
+  listeners: Set<() => void>;
+  stopWatching: (() => void) | null;
+}
+
+/** By normalized URI, so a folder written with or without its slash or escapes is one folder. */
+const folders = new Map<string, Folder>();
+
+function read(uri: string): FolderState {
+  try {
+    return { status: 'ready', items: listFolder(uri) };
+  } catch (error) {
+    if (!folderExists(uri)) return { status: 'missing' };
+    console.warn('Stash could not list a folder', { uri, error });
+    return { status: 'unreadable' };
+  }
+}
+
+function isSameItem(first: LocalItem, second: LocalItem): boolean {
+  return (
+    first.uri === second.uri &&
+    first.name === second.name &&
+    first.isFolder === second.isFolder &&
+    first.size === second.size &&
+    first.modifiedAt === second.modifiedAt
+  );
+}
+
+function isSameState(first: FolderState, second: FolderState): boolean {
+  if (first.status !== 'ready' || second.status !== 'ready') return first.status === second.status;
+  if (first.items.length !== second.items.length) return false;
+  return first.items.every((item, index) => {
+    const other = second.items[index];
+    return other !== undefined && isSameItem(item, other);
+  });
+}
+
+function folderAt(uri: string): Folder {
+  const key = normalizeUri(uri);
+  const known = folders.get(key);
+  if (known) return known;
+  const folder: Folder = { uri, state: read(uri), listeners: new Set(), stopWatching: null };
+  folders.set(key, folder);
+  return folder;
+}
+
+function update(folder: Folder): void {
+  const next = read(folder.uri);
+  if (isSameState(folder.state, next)) return;
+  folder.state = next;
+  for (const listener of folder.listeners) listener();
+}
+
+export function getFolderState(uri: string): FolderState {
+  return folderAt(uri).state;
+}
+
+/**
+ * Follows a folder while anything shows it. A platform that cannot watch it
+ * still shows Stash's own changes, which call `refreshFolder`.
+ */
+export function subscribeFolder(uri: string, listener: () => void): () => void {
+  const folder = folderAt(uri);
+  folder.listeners.add(listener);
+  if (folder.listeners.size === 1) {
+    update(folder);
+    try {
+      folder.stopWatching = watchFolder(folder.uri, () => update(folder));
+    } catch (error) {
+      console.warn('Stash cannot watch a folder; it shows its own changes only', { uri, error });
+    }
+  }
+  return () => {
+    folder.listeners.delete(listener);
+    if (folder.listeners.size > 0) return;
+    folder.stopWatching?.();
+    folder.stopWatching = null;
+  };
+}
+
+/** Lists a folder again after Stash changed it. */
+export function refreshFolder(uri: string): void {
+  const folder = folders.get(normalizeUri(uri));
+  if (folder) update(folder);
+}

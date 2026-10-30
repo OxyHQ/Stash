@@ -1,0 +1,114 @@
+import { Button } from '@oxy.so/bloom/button';
+import {
+  RiAddLine,
+  RiCloudLine,
+  RiComputerLine,
+  RiDeleteBinLine,
+  RiDownloadLine,
+  RiFileTextLine,
+  RiFilmLine,
+  RiGalleryLine,
+  RiHardDrive2Line,
+  RiHomeLine,
+  RiImageLine,
+  RiMusic2Line,
+  RiSmartphoneLine,
+} from '@oxy.so/bloom/icons';
+import type { SidebarIcon, SidebarTree } from '@oxy.so/bloom/sidebar';
+import { useAlbums } from '@/hooks/use-albums';
+import { useLocale } from '@/hooks/use-locale';
+import { useViewer } from '@/hooks/use-viewer';
+import { type Location, locationKey } from '@/lib/items';
+import type { LocalPlace } from '@/lib/local-places';
+
+const PLACE_ICONS: Record<LocalPlace['kind'], SidebarIcon> = {
+  home: RiHomeLine,
+  desktop: RiComputerLine,
+  documents: RiFileTextLine,
+  downloads: RiDownloadLine,
+  pictures: RiImageLine,
+  music: RiMusic2Line,
+  videos: RiFilmLine,
+  volume: RiHardDrive2Line,
+  device: RiSmartphoneLine,
+};
+
+/**
+ * The sidebar, as Finder's: Favourites (the home and its standard folders, or
+ * this device's folder), Oxy (Oxy Files and Photos), the albums, and
+ * Locations (the volumes and the Trash). Each row's key is the location it
+ * opens.
+ */
+export function useSidebarTree(
+  places: readonly LocalPlace[],
+  onNewAlbum: () => void,
+): { tree: SidebarTree[]; locations: ReadonlyMap<string, Location> } {
+  const { strings } = useLocale();
+  const { isSignedIn } = useViewer();
+  const albums = useAlbums();
+  const locations = new Map<string, Location>();
+  const row = (location: Location, label: string, icon: SidebarIcon) => {
+    const key = locationKey(location);
+    locations.set(key, location);
+    return { key, label, icon };
+  };
+
+  const favourites = places.filter((place) => place.kind !== 'volume');
+  const volumes = places.filter((place) => place.kind === 'volume');
+  const tree: SidebarTree[] = [];
+  if (favourites.length > 0) {
+    tree.push({
+      key: 'favourites',
+      label: strings.sections.favourites,
+      items: favourites.map((place) =>
+        row({ kind: 'folder', uri: place.uri }, place.name, PLACE_ICONS[place.kind]),
+      ),
+    });
+  }
+  tree.push({
+    key: 'oxy',
+    label: strings.sections.oxy,
+    items: [
+      row({ kind: 'cloud' }, strings.cloud, RiCloudLine),
+      row({ kind: 'photos' }, strings.photos, RiImageLine),
+    ],
+  });
+  if (isSignedIn) {
+    tree.push({
+      key: 'albums',
+      label: strings.sections.albums,
+      actions: (
+        <Button
+          size="xs"
+          iconOnly
+          appearance="plain"
+          tone="neutral"
+          leadingIcon={RiAddLine}
+          accessibilityLabel={strings.menus.newAlbum}
+          onPress={onNewAlbum}
+          testID="new-album"
+        />
+      ),
+      loading: albums.isPending,
+      error: albums.isError ? strings.couldNotLoad : undefined,
+      emptyLabel: strings.empty.albums,
+      items: [
+        row({ kind: 'albums' }, strings.albums, RiGalleryLine),
+        ...(albums.data ?? []).map((album) =>
+          row({ kind: 'album', albumId: album.id }, album.name, RiGalleryLine),
+        ),
+      ],
+    });
+  }
+  tree.push({
+    key: 'locations',
+    label: strings.sections.locations,
+    items: [
+      ...volumes.map((place) =>
+        row({ kind: 'folder', uri: place.uri }, place.name, PLACE_ICONS.volume),
+      ),
+      row({ kind: 'trash' }, strings.trash, RiDeleteBinLine),
+    ],
+  });
+  return { tree, locations };
+}
