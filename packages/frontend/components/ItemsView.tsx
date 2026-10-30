@@ -67,6 +67,7 @@ import {
   type LastPress,
   NO_PRESS,
   NO_SELECTION,
+  pressTime,
   type Selection,
   selectOnly,
 } from '@/lib/selection';
@@ -298,7 +299,7 @@ export function ItemsView({
     }
     // The press's own time, not when it was handled: a first click that was
     // slow to draw still makes a double click with the second.
-    const at = event.timeStamp;
+    const at = pressTime(event);
     const isSecond = isSecondClick(lastPress.current, item.key, at);
     lastPress.current = isSecond ? NO_PRESS : { key: item.key, at };
     if (isSecond && !shiftKey && !isToggling) {
