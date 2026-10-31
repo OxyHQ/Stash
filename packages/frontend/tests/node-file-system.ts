@@ -64,9 +64,27 @@ export class Directory extends Entry {
     super(true, parts);
   }
 
-  info(): { exists: boolean; modificationTime?: number } {
+  /** Its own date, one look at it, as OxyOS publishes it (Expo's Android and iOS modules do not). */
+  get lastModified(): number {
+    return fs.statSync(this.target).mtimeMs;
+  }
+
+  /** As expo-file-system answers it: its size is every file's below it, read by walking its whole tree. */
+  info(): { exists: boolean; size?: number; modificationTime?: number; files?: string[] } {
     const stat = fs.statSync(this.target);
-    return { exists: true, modificationTime: stat.mtimeMs };
+    const size = fs
+      .readdirSync(this.target, { recursive: true, withFileTypes: true })
+      .filter((dirent) => dirent.isFile())
+      .reduce(
+        (total, dirent) => total + fs.statSync(path.join(dirent.parentPath, dirent.name)).size,
+        0,
+      );
+    return {
+      exists: true,
+      size,
+      modificationTime: stat.mtimeMs,
+      files: fs.readdirSync(this.target),
+    };
   }
 
   list(): (Directory | File)[] {

@@ -375,8 +375,12 @@ export function ItemsView({
     );
   };
 
+  // Whether there are menus at all, not the menus themselves (new at every
+  // selection, as the commands in them are): the context menu keeps what it
+  // publishes while the selection changes.
+  const hasMenus = menus !== null;
   const openMenu = (anchor: ContextMenuAnchor | null) => {
-    setMenu(anchor && menus ? { anchor, key: menuTarget.current } : null);
+    setMenu(anchor && hasMenus ? { anchor, key: menuTarget.current } : null);
   };
 
   const handleGrant = (event: GestureResponderEvent) => {

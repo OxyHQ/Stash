@@ -1,9 +1,11 @@
 /**
  * What this device's folders hold, kept for the views that show them and
- * read with `useSyncExternalStore`. A folder is listed when a view first
- * shows it and again whenever the file system says it changed
- * (`Directory.watch`) or Stash changed it; its state keeps its identity while
- * what it holds is the same, so a burst of watched changes redraws nothing.
+ * read with `useSyncExternalStore`. A folder is listed once when a view first
+ * shows it, again when a view shows it after nothing followed it for a while
+ * (it may have changed meanwhile), and whenever the file system says it
+ * changed (`Directory.watch`, whose events come coalesced) or Stash changed it;
+ * its state keeps its identity while what it holds is the same, so a burst of
+ * watched changes redraws nothing.
  */
 import type { LocalItem } from '@/lib/items';
 import { folderExists, listFolder, watchFolder } from '@/lib/local-files';
@@ -20,6 +22,12 @@ interface Folder {
   /** The URI it is read at, as the first view to show it wrote it. */
   uri: string;
   state: FolderState;
+  /**
+   * Whether `state` may be behind the folder: nothing has followed it since it
+   * was read. A folder read for a view's first draw is current; the view's
+   * subscription starts watching it without listing it a second time.
+   */
+  isStale: boolean;
   listeners: Set<() => void>;
   stopWatching: (() => void) | null;
 }
@@ -56,11 +64,34 @@ function isSameState(first: FolderState, second: FolderState): boolean {
   });
 }
 
+/**
+ * A new listing keeping the items it shares with the one before as the same
+ * objects: a file added to a folder draws that file, and moves the ones after
+ * it, rather than drawing every item again.
+ */
+function keepingKnownItems(next: FolderState, previous: FolderState): FolderState {
+  if (next.status !== 'ready' || previous.status !== 'ready') return next;
+  const known = new Map(previous.items.map((item) => [item.uri, item]));
+  return {
+    status: 'ready',
+    items: next.items.map((item) => {
+      const before = known.get(item.uri);
+      return before && isSameItem(before, item) ? before : item;
+    }),
+  };
+}
+
 function folderAt(uri: string): Folder {
   const key = normalizeUri(uri);
   const known = folders.get(key);
   if (known) return known;
-  const folder: Folder = { uri, state: read(uri), listeners: new Set(), stopWatching: null };
+  const folder: Folder = {
+    uri,
+    state: read(uri),
+    isStale: false,
+    listeners: new Set(),
+    stopWatching: null,
+  };
   folders.set(key, folder);
   return folder;
 }
@@ -68,7 +99,7 @@ function folderAt(uri: string): Folder {
 function update(folder: Folder): void {
   const next = read(folder.uri);
   if (isSameState(folder.state, next)) return;
-  folder.state = next;
+  folder.state = keepingKnownItems(next, folder.state);
   for (const listener of folder.listeners) listener();
 }
 
@@ -84,7 +115,8 @@ export function subscribeFolder(uri: string, listener: () => void): () => void {
   const folder = folderAt(uri);
   folder.listeners.add(listener);
   if (folder.listeners.size === 1) {
-    update(folder);
+    if (folder.isStale) update(folder);
+    folder.isStale = false;
     try {
       folder.stopWatching = watchFolder(folder.uri, () => update(folder));
     } catch (error) {
@@ -96,6 +128,7 @@ export function subscribeFolder(uri: string, listener: () => void): () => void {
     if (folder.listeners.size > 0) return;
     folder.stopWatching?.();
     folder.stopWatching = null;
+    folder.isStale = true;
   };
 }
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -60,6 +60,22 @@ describe('files on this device', () => {
     expect(byName.get('Documents')).toMatchObject({ isFolder: true, size: null });
     expect(byName.get('.env')?.isHidden).toBe(true);
     expect(byName.get('notes.md')?.modifiedAt).toBeGreaterThan(0);
+  });
+
+  test("are listed with each folder's own date, never asking it for its info, which walks everything inside it", () => {
+    for (let index = 0; index < 50; index++) write(`node_modules/package-${index}/index.js`);
+    const info = spyOn(Directory.prototype, 'info');
+    try {
+      const items = local.listFolder(local.deviceFolderUri());
+      expect(items.find((item) => item.name === 'node_modules')).toMatchObject({
+        isFolder: true,
+        size: null,
+        modifiedAt: fs.statSync(path.join(root, 'node_modules')).mtimeMs,
+      });
+      expect(info).not.toHaveBeenCalled();
+    } finally {
+      info.mockRestore();
+    }
   });
 
   test('take a new folder only under a free, valid name', () => {

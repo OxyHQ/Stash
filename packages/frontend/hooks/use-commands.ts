@@ -89,7 +89,25 @@ function runAsync(action: string, work: () => Promise<unknown>): void {
  * reader's actions alike.
  */
 export function useCommands(context: CommandContext) {
-  const { location, shown, selected, places, albums, album } = context;
+  // Each part read on its own: what is made of one (a command's run) is kept
+  // while that part stays the same. Read from `context`, a new object at every
+  // render, everything made of it was new at every click.
+  const {
+    location,
+    shown,
+    selected,
+    places,
+    albums,
+    album,
+    navigate,
+    preview,
+    startRename,
+    confirm,
+    renameAlbum,
+    newAlbum,
+    setSelection,
+    selectAll,
+  } = context;
   const fileActions = useFileActions();
   const transfers = useTransfers();
   const albumActions = useAlbumActions();
@@ -117,10 +135,9 @@ export function useCommands(context: CommandContext) {
   const shownAlbum = album ?? (selected.length === 1 ? (albumSelected ?? null) : null);
 
   const open = (item: Item) => {
-    if (item.source === 'local' && item.isFolder)
-      context.navigate({ kind: 'folder', uri: item.uri });
-    else if (item.source === 'album') context.navigate({ kind: 'album', albumId: item.albumId });
-    else context.preview(item);
+    if (item.source === 'local' && item.isFolder) navigate({ kind: 'folder', uri: item.uri });
+    else if (item.source === 'album') navigate({ kind: 'album', albumId: item.albumId });
+    else preview(item);
   };
 
   return {
@@ -129,19 +146,19 @@ export function useCommands(context: CommandContext) {
     }),
     openItem: open,
     preview: command(first !== null && !isContainer(first), () => {
-      if (first) context.preview(first);
+      if (first) preview(first);
     }),
     rename: command(isInFolder && selected.length === 1 && first !== null && isLocal(first), () => {
-      if (first && isLocal(first)) context.startRename(first);
+      if (first && isLocal(first)) startRename(first);
     }),
     newFolder: command(isInFolder, () => {
       if (location.kind !== 'folder') return;
       const made = fileActions.newFolder(location.uri);
       if (!made) return;
-      context.setSelection({ keys: [made.key], anchor: made.key, focus: made.key });
-      context.startRename(made);
+      setSelection({ keys: [made.key], anchor: made.key, focus: made.key });
+      startRename(made);
     }),
-    newAlbum: command(isSignedIn, context.newAlbum),
+    newAlbum: command(isSignedIn, newAlbum),
     /** Into the Trash: the platform's for this device's items, Oxy Files' for its own. */
     moveToTrash: command(
       !isInTrash && (isAllCloud || (isAllLocal && fileActions.hasPlatformTrash)),
@@ -149,18 +166,18 @@ export function useCommands(context: CommandContext) {
     ),
     /** Deleting for good, where this device's items have no Trash to go to. */
     deleteForGood: command(isAllLocal && !fileActions.hasPlatformTrash, () =>
-      context.confirm({ kind: 'delete-for-good', items: localSelected }),
+      confirm({ kind: 'delete-for-good', items: localSelected }),
     ),
     hasPlatformTrash: fileActions.hasPlatformTrash,
     putBack: command(isInTrash && selected.length > 0, () =>
       runAsync('put items back', () => fileActions.putBack(selected.filter(isTrash))),
     ),
     eraseNow: command(isInTrash && selected.length > 0, () =>
-      context.confirm({ kind: 'erase', items: selected.filter(isTrash) }),
+      confirm({ kind: 'erase', items: selected.filter(isTrash) }),
     ),
     emptyTrash: command(
       (fileActions.hasPlatformTrash || isSignedIn) && (!isInTrash || shown.length > 0),
-      () => context.confirm({ kind: 'empty-trash' }),
+      () => confirm({ kind: 'empty-trash' }),
     ),
     upload: command(isAllUploadable, () =>
       runAsync('upload items', () => transfers.uploadLocal(localSelected)),
@@ -191,12 +208,12 @@ export function useCommands(context: CommandContext) {
       ),
     ),
     renameAlbum: command(shownAlbum !== null, () => {
-      if (shownAlbum) context.renameAlbum(shownAlbum);
+      if (shownAlbum) renameAlbum(shownAlbum);
     }),
     deleteAlbum: command(shownAlbum !== null, () => {
-      if (shownAlbum) context.confirm({ kind: 'delete-album', album: shownAlbum });
+      if (shownAlbum) confirm({ kind: 'delete-album', album: shownAlbum });
     }),
-    selectAll: command(shown.length > 0, context.selectAll),
+    selectAll: command(shown.length > 0, selectAll),
     signIn: command(!isSignedIn, signIn),
 
     /** Dropping dragged items on an item: into a folder, into an album. */
@@ -235,7 +252,7 @@ export function useCommands(context: CommandContext) {
           runAsync('delete an album', async () => {
             await albumActions.remove(request.album);
             if (location.kind === 'album' && location.albumId === request.album.id) {
-              context.navigate({ kind: 'albums' });
+              navigate({ kind: 'albums' });
             }
           });
           break;
