@@ -217,6 +217,18 @@ const en = {
     cloud: 'Oxy Files',
     unknown: 'Unknown',
   },
+  chooser: {
+    open: 'Open',
+    chooseFolder: 'Choose a Folder',
+    save: 'Save',
+    saveAs: 'Save As:',
+    name: 'Name',
+    replaceTitle: (name: string) => `“${name}” already exists. Do you want to replace it?`,
+    replaceBody: (folder: string) =>
+      `An item with the same name is already in “${folder}”. Replacing it overwrites what it holds.`,
+    replace: 'Replace',
+    folderTaken: 'A folder with that name is already here. Choose another name.',
+  },
 };
 
 export type Strings = typeof en;
@@ -437,6 +449,18 @@ const es: Strings = {
   origins: {
     cloud: 'Oxy Files',
     unknown: 'Desconocida',
+  },
+  chooser: {
+    open: 'Abrir',
+    chooseFolder: 'Elegir una carpeta',
+    save: 'Guardar',
+    saveAs: 'Guardar como:',
+    name: 'Nombre',
+    replaceTitle: (name) => `«${name}» ya existe. ¿Quieres reemplazarlo?`,
+    replaceBody: (folder) =>
+      `Ya hay un elemento con el mismo nombre en «${folder}». Si lo reemplazas, se sobrescribe lo que contiene.`,
+    replace: 'Reemplazar',
+    folderTaken: 'Ya hay una carpeta con ese nombre aquí. Elige otro nombre.',
   },
 };
 

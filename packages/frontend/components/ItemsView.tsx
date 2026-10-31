@@ -19,6 +19,9 @@
  * JavaScript. The view redraws only when the width crosses a threshold (a
  * grid's columns, the list's), and reads the exact width when a press, a band
  * or a key acts on the places.
+ *
+ * Items the window cannot select now (the file chooser's, that the request
+ * cannot take) are drawn dimmed.
  */
 import {
   ContextMenu,
@@ -154,8 +157,10 @@ export interface ItemsViewProps {
   onAction: (item: Item, action: string) => void;
   /** An item's actions for assistive technology; the same list for items alike. */
   itemActions: (item: Item) => readonly AccessibilityActionInfo[];
-  itemMenu: (item: Item) => ReactNode;
-  backgroundMenu: ReactNode;
+  /** The context menu's rows for an item and for the place; null: the view has no context menu. */
+  menus: { item: (item: Item) => ReactNode; background: ReactNode } | null;
+  /** Items drawn dimmed: there, but not selectable now. */
+  dimmedKeys: ReadonlySet<string>;
   emptyState: ReactNode;
   /**
    * The grid's columns at the width it was laid out at, for the arrows' steps
@@ -188,8 +193,8 @@ export function ItemsView({
   onDrop,
   onAction,
   itemActions,
-  itemMenu,
-  backgroundMenu,
+  menus,
+  dimmedKeys,
   emptyState,
   onColumnsChange,
   onEndReached,
@@ -368,7 +373,7 @@ export function ItemsView({
   };
 
   const openMenu = (anchor: ContextMenuAnchor | null) => {
-    setMenu(anchor ? { anchor, key: menuTarget.current } : null);
+    setMenu(anchor && menus ? { anchor, key: menuTarget.current } : null);
   };
 
   const handleGrant = (event: GestureResponderEvent) => {
@@ -519,6 +524,7 @@ export function ItemsView({
           height={frame.height}
           isStriped={index % 2 === 1}
           isSelected={isItemSelected}
+          isDimmed={dimmedKeys.has(item.key)}
           isWindowActive={isWindowActive}
           isDropTarget={isDropTarget}
           rename={itemRename}
@@ -545,6 +551,7 @@ export function ItemsView({
         height={frame.height}
         layer={rowCount - Math.floor(index / geometry.columns)}
         isSelected={isItemSelected}
+        isDimmed={dimmedKeys.has(item.key)}
         isWindowActive={isWindowActive}
         isDropTarget={isDropTarget}
         rename={itemRename}
@@ -704,7 +711,9 @@ export function ItemsView({
           </ScrollView>
         </View>
       </ContextMenuTrigger>
-      <ContextMenuContent>{menuItem ? itemMenu(menuItem) : backgroundMenu}</ContextMenuContent>
+      <ContextMenuContent>
+        {menus ? (menuItem ? menus.item(menuItem) : menus.background) : null}
+      </ContextMenuContent>
     </ContextMenu>
   );
 }

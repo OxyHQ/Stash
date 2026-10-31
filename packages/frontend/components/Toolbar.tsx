@@ -27,6 +27,7 @@ import { useLocale } from '@/hooks/use-locale';
 
 export function Toolbar({
   title,
+  placeName,
   viewMode,
   onViewMode,
   search,
@@ -40,6 +41,8 @@ export function Toolbar({
   onUpload,
 }: {
   title: string;
+  /** The place shown, which the search looks in: the title, but in the file chooser, whose title is its own. */
+  placeName: string;
   viewMode: ViewMode;
   onViewMode: (mode: ViewMode) => void;
   search: string;
@@ -159,7 +162,7 @@ export function Toolbar({
                 onClearText={() => onSearch('')}
                 onBlur={() => setSearchOpen(false)}
                 autoFocus={compact && isSearchOpen}
-                placeholder={compact ? strings.search : strings.searchIn(title)}
+                placeholder={compact ? strings.search : strings.searchIn(placeName)}
                 accessibilityLabel={strings.search}
                 testID="search"
               />

@@ -13,11 +13,22 @@ import {
   typeSelect,
 } from '@/lib/selection';
 
+/** What the file chooser's panel does for its keys. */
+export interface ChooserKeys {
+  /** ⌘↓: what a double click on the selected item does. */
+  onActivate: () => void;
+  /** Return: the panel's button, when it is enabled; false when it is not. */
+  onConfirm: () => boolean;
+  /** Escape, even in a field: the panel is cancelled. */
+  onCancel: () => void;
+}
+
 /**
  * The window's own keys, after the menus' shortcuts (ADR 0021): the arrows
  * (across and down a grid, down a list; Shift extends), Home and End, Return
  * to rename, Space for a preview, Escape to close it or cancel a rename, and a
- * name's first letters to select it (type-select).
+ * name's first letters to select it (type-select). In the file chooser,
+ * Return is the panel's button and Escape cancels it.
  */
 export function useBrowserKeys({
   isEnabled,
@@ -30,6 +41,7 @@ export function useBrowserKeys({
   onTogglePreview,
   isRenaming,
   onCancelRename,
+  chooser,
 }: {
   isEnabled: boolean;
   viewMode: ViewMode;
@@ -42,6 +54,7 @@ export function useBrowserKeys({
   onTogglePreview: () => void;
   isRenaming: boolean;
   onCancelRename: () => void;
+  chooser: ChooserKeys | null;
 }) {
   const typed = useRef({ text: '', at: 0 });
   const keys = shown.map((item) => item.key);
@@ -55,7 +68,8 @@ export function useBrowserKeys({
     switch (event.key) {
       case 'ArrowDown':
         if (isCommand) {
-          commands.open.run();
+          if (chooser) chooser.onActivate();
+          else commands.open.run();
           return true;
         }
         return step(viewMode === 'list' ? 1 : getColumns());
@@ -73,6 +87,7 @@ export function useBrowserKeys({
         );
         return true;
       case 'Enter':
+        if (chooser) return chooser.onConfirm();
         if (!commands.rename.isEnabled) return false;
         commands.rename.run();
         return true;
@@ -105,5 +120,14 @@ export function useBrowserKeys({
       return true;
     },
     { enabled: isRenaming, whileTyping: true },
+  );
+  // Escape cancels the panel wherever the keys are, its name field and the search included.
+  useWindowKeys(
+    (event) => {
+      if (event.key !== 'Escape' || !chooser) return false;
+      chooser.onCancel();
+      return true;
+    },
+    { enabled: isEnabled && chooser !== null && !isRenaming && !isPreviewOpen, whileTyping: true },
   );
 }

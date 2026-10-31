@@ -4,13 +4,18 @@
  * (a folder on this device, Oxy Files, Photos, the albums, an album, the
  * Trash) is shown by this one component from its listing; only what the
  * listing holds and what can be done to it differ.
+ *
+ * As the file chooser (the platform's `files.chooser`) the pane is the open
+ * or save panel's: the same toolbar, items and preview, without menus or
+ * changes to the items, the items the request cannot take dimmed, and the
+ * panel's bar under them; a double click or Return answers with what fits.
  */
 import { AlertDialog } from '@oxy.so/bloom/alert-dialog';
 import { type AppShellPanelDefinition, AppShellPanels } from '@oxy.so/bloom/app-shell';
 import { EmptyState } from '@oxy.so/bloom/empty-state';
 import type { BloomIconComponent } from '@oxy.so/bloom/icons';
 import { Loading } from '@oxy.so/bloom/loading';
-import { usePlatformMenuBar } from '@oxy.so/bloom/platform-surface';
+import { usePlatformFiles, usePlatformMenuBar } from '@oxy.so/bloom/platform-surface';
 import { Screen } from '@oxy.so/bloom/screen';
 import { Text } from '@oxy.so/bloom/typography';
 import { useWindowWidthClass } from '@oxy.so/bloom/hooks';
@@ -21,6 +26,7 @@ import { View } from 'react-native';
 import { AlbumNameDialog } from '@/components/AlbumNameDialog';
 import { BrowserMenus } from '@/components/BrowserMenus';
 import { useBrowser } from '@/components/BrowserProvider';
+import { ChooserBar } from '@/components/ChooserBar';
 import { BackgroundMenuRows, ItemMenuRows } from '@/components/ItemMenus';
 import { ItemsView } from '@/components/ItemsView';
 import { PreviewDialog } from '@/components/PreviewDialog';
@@ -34,6 +40,15 @@ import { useBrowserKeys } from '@/hooks/use-browser-keys';
 import { type ConfirmRequest, useCommands } from '@/hooks/use-commands';
 import { useLocale } from '@/hooks/use-locale';
 import { useLocalPlaces } from '@/hooks/use-local-places';
+import {
+  activateStep,
+  type ChooserStep,
+  chooserTitle,
+  isSelectable,
+  openStep,
+  saveStep,
+} from '@/lib/chooser';
+import { answerCancelled, answerChosen } from '@/lib/chooser-answer';
 import { selectionOnArrival } from '@/lib/history';
 import { previewOnPlatform } from '@/lib/local-files';
 import { type Item, itemKind, type LocalItem, type Location } from '@/lib/items';
@@ -105,6 +120,7 @@ export function Browser({ listing }: { listing: Listing }) {
   const albums = useAlbums();
   const platformWindow = useWindow();
   const platformMenuBar = usePlatformMenuBar();
+  const chooser = usePlatformFiles()?.chooser ?? null;
   const isWindowActive = platformWindow ? platformWindow.active : true;
 
   const [rawSelection, setSelection] = useState<Selection>(() =>
@@ -116,6 +132,8 @@ export function Browser({ listing }: { listing: Listing }) {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [albumBeingRenamed, setAlbumBeingRenamed] = useState<Album | null>(null);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
+  // The save panel's file of the name typed, asked about before it is replaced.
+  const [replacing, setReplacing] = useState<{ uri: string; name: string } | null>(null);
   // The grid's columns, for the arrows: read as a key is pressed, never drawn.
   const columns = useRef(1);
   // The name being typed in place, kept here so a press elsewhere keeps it as
@@ -126,12 +144,20 @@ export function Browser({ listing }: { listing: Listing }) {
   const order = browser.orderFor(location);
   const shown = sortItems(visibleItems(items, search, browser.isShowingHidden), order);
   const shownKeys = shown.map((item) => item.key);
+  // The file chooser selects what the request can take, and the folders it goes into.
+  const selectable = chooser ? shown.filter((item) => isSelectable(item, chooser.request)) : shown;
+  const selectableKeys = selectable.map((item) => item.key);
+  const dimmedKeys = new Set(
+    chooser
+      ? shown.filter((item) => !isSelectable(item, chooser.request)).map((item) => item.key)
+      : [],
+  );
   // Items gone, renamed or searched away leave the selection.
-  const selection = keepShown(rawSelection, shownKeys);
+  const selection = keepShown(rawSelection, selectableKeys);
   const selected = shown.filter((item) => isSelected(selection, item.key));
   const previewed = selected.length === 1 ? (selected[0] ?? null) : null;
   const handleSelectionChange = (change: (current: Selection) => Selection) =>
-    setSelection((current) => change(keepShown(current, shownKeys)));
+    setSelection((current) => change(keepShown(current, selectableKeys)));
 
   const sources = shown.map((item) => ({ item, source: thumbnailSource(item) }));
   const urlRequests = sources.flatMap(({ source }) =>
@@ -190,6 +216,68 @@ export function Browser({ listing }: { listing: Listing }) {
     selectAll: () => setSelection(selectAll(shownKeys)),
   });
 
+  // The file chooser's answers: what its button, a double click and Return do.
+  const folderUri = location.kind === 'folder' ? location.uri : null;
+  const answer = (uris: readonly string[]) => {
+    if (!chooser) return;
+    answerChosen(chooser, uris, folderUri).catch((error: unknown) =>
+      console.warn('Stash could not answer the file chooser', { uris, error }),
+    );
+  };
+  const runStep = (step: ChooserStep) => {
+    switch (step.kind) {
+      case 'choose':
+        answer(step.uris);
+        break;
+      case 'enter':
+        browser.navigate({ kind: 'folder', uri: step.uri });
+        break;
+      case 'name':
+        browser.setSaveName(step.name);
+        break;
+      case 'none':
+        break;
+    }
+  };
+  const save = () => {
+    if (!folderUri) return;
+    const step = saveStep(
+      browser.saveName,
+      folderUri,
+      items.filter((item): item is LocalItem => item.source === 'local'),
+    );
+    switch (step.kind) {
+      case 'save':
+        answer([step.uri]);
+        break;
+      case 'replace':
+        setReplacing({ uri: step.uri, name: browser.saveName });
+        break;
+      case 'problem':
+        setNameProblem(
+          step.problem === 'folder-taken'
+            ? strings.chooser.folderTaken
+            : strings.nameProblems[step.problem],
+        );
+        break;
+    }
+  };
+  const chooserOpenStep = chooser ? openStep(chooser.request, selected, folderUri) : null;
+  const isChooserConfirmEnabled =
+    chooser?.request.mode === 'save'
+      ? folderUri !== null && browser.saveName.trim() !== ''
+      : chooserOpenStep !== null && chooserOpenStep.kind !== 'none';
+  const confirmChooser = () => {
+    if (!isChooserConfirmEnabled) return;
+    if (chooser?.request.mode === 'save') save();
+    else if (chooserOpenStep) runStep(chooserOpenStep);
+  };
+  /** A double click, a tap, or a screen reader's activation of an item. */
+  const activate = (item: Item) => {
+    if (chooser) runStep(activateStep(chooser.request, item));
+    else commands.openItem(item);
+  };
+
   const startRename = (item: LocalItem) => {
     renaming.current = { key: item.key, text: item.name };
     setRenamingKey(item.key);
@@ -217,10 +305,10 @@ export function Browser({ listing }: { listing: Listing }) {
   };
 
   useBrowserKeys({
-    isEnabled: isWindowActive && confirm === null,
+    isEnabled: isWindowActive && confirm === null && replacing === null && nameProblem === null,
     viewMode,
     getColumns: () => columns.current,
-    shown,
+    shown: selectable,
     onSelectionChange: handleSelectionChange,
     commands,
     isPreviewOpen: previewItem !== null,
@@ -230,6 +318,19 @@ export function Browser({ listing }: { listing: Listing }) {
     },
     isRenaming: renamingKey !== null,
     onCancelRename: cancelRename,
+    chooser: chooser
+      ? {
+          onActivate: () => {
+            if (selected.length === 1 && selected[0]) activate(selected[0]);
+          },
+          onConfirm: () => {
+            if (!isChooserConfirmEnabled) return false;
+            confirmChooser();
+            return true;
+          },
+          onCancel: () => answerCancelled(chooser),
+        }
+      : null,
   });
 
   const path = location.kind === 'folder' ? pathParts(location.uri, places) : [];
@@ -275,7 +376,13 @@ export function Browser({ listing }: { listing: Listing }) {
   const cloudActions = [...openActions, trashAction];
   const otherActions = location.kind === 'trash' ? cloudActions : openActions;
   const itemActions = (item: Item) =>
-    item.source === 'local' ? localActions : item.source === 'cloud' ? cloudActions : otherActions;
+    chooser
+      ? openActions
+      : item.source === 'local'
+        ? localActions
+        : item.source === 'cloud'
+          ? cloudActions
+          : otherActions;
 
   const body =
     listing.status === 'signed-out' ? (
@@ -337,11 +444,11 @@ export function Browser({ listing }: { listing: Listing }) {
                   }
                   hasOriginColumn={location.kind === 'trash'}
                   originOf={originOf}
-                  onOpen={commands.openItem}
-                  canDrop={commands.canDrop}
+                  onOpen={activate}
+                  canDrop={chooser ? () => false : commands.canDrop}
                   onDrop={commands.drop}
                   onAction={(item, action) => {
-                    if (action === 'activate') commands.openItem(item);
+                    if (action === 'activate') activate(item);
                     else if (action === 'select') {
                       handleSelectionChange((current) =>
                         isSelected(current, item.key)
@@ -362,15 +469,22 @@ export function Browser({ listing }: { listing: Listing }) {
                     }
                   }}
                   itemActions={itemActions}
-                  itemMenu={(item) => <ItemMenuRows item={item} commands={commands} />}
-                  backgroundMenu={
-                    <BackgroundMenuRows
-                      commands={commands}
-                      location={location}
-                      viewMode={viewMode}
-                      onViewMode={(mode) => browser.setViewMode(location, mode)}
-                    />
+                  menus={
+                    chooser
+                      ? null
+                      : {
+                          item: (item) => <ItemMenuRows item={item} commands={commands} />,
+                          background: (
+                            <BackgroundMenuRows
+                              commands={commands}
+                              location={location}
+                              viewMode={viewMode}
+                              onViewMode={(mode) => browser.setViewMode(location, mode)}
+                            />
+                          ),
+                        }
                   }
+                  dimmedKeys={dimmedKeys}
                   emptyState={emptyState}
                   onColumnsChange={(next) => {
                     columns.current = next;
@@ -463,7 +577,8 @@ export function Browser({ listing }: { listing: Listing }) {
       scroll="none"
       header={
         <Toolbar
-          title={listing.title}
+          title={chooser ? chooserTitle(chooser.request, strings) : listing.title}
+          placeName={listing.title}
           viewMode={viewMode}
           onViewMode={(mode) => browser.setViewMode(location, mode)}
           search={search}
@@ -475,14 +590,42 @@ export function Browser({ listing }: { listing: Listing }) {
           isPreviewShown={browser.isPreviewShown}
           onPreviewShown={browser.setPreviewShown}
           onUpload={
-            location.kind === 'cloud' && commands.uploadPicked.isEnabled
+            !chooser && location.kind === 'cloud' && commands.uploadPicked.isEnabled
               ? commands.uploadPicked.run
               : null
           }
         />
       }
       bottomBar={
-        listing.status === 'ready' ? (
+        chooser ? (
+          <View>
+            {listing.status === 'ready' ? (
+              // The panel always shows where it is: its title is the asking application's.
+              <StatusBar
+                text={statusText}
+                path={path}
+                onPath={(uri) => browser.navigate({ kind: 'folder', uri })}
+              />
+            ) : null}
+            <ChooserBar
+              mode={chooser.request.mode}
+              confirmLabel={
+                chooser.request.mode === 'save' ? strings.chooser.save : strings.chooser.open
+              }
+              isConfirmEnabled={isChooserConfirmEnabled}
+              onConfirm={confirmChooser}
+              onCancel={() => answerCancelled(chooser)}
+              name={browser.saveName}
+              onName={browser.setSaveName}
+              onNewFolder={
+                (chooser.request.mode === 'save' || chooser.request.directory) &&
+                commands.newFolder.isEnabled
+                  ? commands.newFolder.run
+                  : null
+              }
+            />
+          </View>
+        ) : listing.status === 'ready' ? (
           <StatusBar
             text={statusText}
             path={isAtPlace ? [] : path}
@@ -491,7 +634,7 @@ export function Browser({ listing }: { listing: Listing }) {
         ) : undefined
       }
     >
-      {platformMenuBar ? menus : <InWindowMenus>{menus}</InWindowMenus>}
+      {chooser ? null : platformMenuBar ? menus : <InWindowMenus>{menus}</InWindowMenus>}
       {body}
       <AlertDialog
         open={confirm !== null}
@@ -530,6 +673,23 @@ export function Browser({ listing }: { listing: Listing }) {
         hideCancel
         onConfirm={() => setNameProblem(null)}
         testID="name-problem"
+      />
+      <AlertDialog
+        open={replacing !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setReplacing(null);
+        }}
+        title={replacing ? strings.chooser.replaceTitle(replacing.name) : ''}
+        description={strings.chooser.replaceBody(listing.title)}
+        confirmLabel={strings.chooser.replace}
+        cancelLabel={strings.cancel}
+        destructive
+        onConfirm={() => {
+          if (replacing) answer([replacing.uri]);
+          setReplacing(null);
+        }}
+        onCancel={() => setReplacing(null)}
+        testID="replace-confirm"
       />
       <PreviewDialog
         item={previewItem}
