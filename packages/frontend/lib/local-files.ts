@@ -35,14 +35,41 @@ function entryAt(item: Pick<LocalItem, 'uri' | 'isFolder'>): Directory | File {
   return item.isFolder ? new Directory(item.uri) : new File(item.uri);
 }
 
+/**
+ * A folder's own date (an item added, removed or renamed in it), from one look
+ * at it, where the platform publishes it: OxyOS does, as `lastModified`, the
+ * name a file's date has. Expo's Android and iOS modules keep the same date for
+ * every path but publish it for files alone, so there a folder has none.
+ */
+function folderDate(folder: Directory): number | null {
+  const date: unknown = Reflect.get(folder, 'lastModified');
+  return typeof date === 'number' ? date : null;
+}
+
+/**
+ * An entry as an item, each from one look at it. A folder is never asked for
+ * its `info()`: expo-file-system answers it by walking everything inside (its
+ * `size` is the sum of every file below it, on Android, iOS and OxyOS alike),
+ * so a listing that asked each of its folders read the whole tree under it,
+ * seconds for a home with a `node_modules`. A folder's size is not shown, as in
+ * Finder's list.
+ */
 function itemOf(entry: Directory | File): LocalItem {
+  if (entry instanceof Directory) {
+    return localItem({
+      uri: entry.uri,
+      name: entry.name,
+      isDirectory: true,
+      size: null,
+      modifiedAt: folderDate(entry),
+    });
+  }
   const info = entry.info();
-  const isDirectory = entry instanceof Directory;
   return localItem({
     uri: entry.uri,
     name: entry.name,
-    isDirectory,
-    size: !isDirectory && 'size' in info && typeof info.size === 'number' ? info.size : null,
+    isDirectory: false,
+    size: typeof info.size === 'number' ? info.size : null,
     modifiedAt: info.modificationTime ?? null,
   });
 }

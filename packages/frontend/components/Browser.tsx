@@ -215,6 +215,12 @@ export function Browser({ listing }: { listing: Listing }) {
     setSelection: (next) => setSelection(next),
     selectAll: () => setSelection(selectAll(shownKeys)),
   });
+  // What the items' actions, the toolbar and the confirmation use, read on
+  // their own: the compiler then keeps what is made of them while they stay the
+  // same. Read from `commands`, new at every selection, what is made of them
+  // was too, and a click drew every item, the toolbar and the closed
+  // confirmation again.
+  const { hasPlatformTrash, uploadPicked, confirmed } = commands;
 
   // The file chooser's answers: what its button, a double click and Return do.
   const folderUri = location.kind === 'folder' ? location.uri : null;
@@ -371,7 +377,7 @@ export function Browser({ listing }: { listing: Listing }) {
   const localActions = [
     ...openActions,
     ...(location.kind === 'folder' ? [{ name: 'rename', label: strings.menus.rename }] : []),
-    ...(location.kind === 'trash' || commands.hasPlatformTrash ? [trashAction] : []),
+    ...(location.kind === 'trash' || hasPlatformTrash ? [trashAction] : []),
   ];
   const cloudActions = [...openActions, trashAction];
   const otherActions = location.kind === 'trash' ? cloudActions : openActions;
@@ -590,8 +596,8 @@ export function Browser({ listing }: { listing: Listing }) {
           isPreviewShown={browser.isPreviewShown}
           onPreviewShown={browser.setPreviewShown}
           onUpload={
-            !chooser && location.kind === 'cloud' && commands.uploadPicked.isEnabled
-              ? commands.uploadPicked.run
+            !chooser && location.kind === 'cloud' && uploadPicked.isEnabled
+              ? uploadPicked.run
               : null
           }
         />
@@ -657,7 +663,7 @@ export function Browser({ listing }: { listing: Listing }) {
         cancelLabel={strings.cancel}
         destructive
         onConfirm={() => {
-          if (confirm) commands.confirmed(confirm);
+          if (confirm) confirmed(confirm);
           setConfirm(null);
         }}
         onCancel={() => setConfirm(null)}
