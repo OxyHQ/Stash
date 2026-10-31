@@ -13,10 +13,11 @@ import { Loading } from '@oxy.so/bloom/loading';
 import { usePlatformMenuBar } from '@oxy.so/bloom/platform-surface';
 import { Screen } from '@oxy.so/bloom/screen';
 import { Text } from '@oxy.so/bloom/typography';
+import { useWindowWidthClass } from '@oxy.so/bloom/hooks';
 import { useWindow } from '@oxy.so/bloom/window';
 import type { Album } from '@stash/shared-types';
 import { type ReactNode, useRef, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { AlbumNameDialog } from '@/components/AlbumNameDialog';
 import { BrowserMenus } from '@/components/BrowserMenus';
 import { useBrowser } from '@/components/BrowserProvider';
@@ -48,6 +49,7 @@ const PREVIEW_MIN_WIDTH = 220;
 const PREVIEW_MAX_WIDTH = 420;
 /** A window this wide draws its menu bar where the platform has none of its own. */
 const MENU_BAR_FROM = 640;
+const MENU_BAR_WIDTHS = [MENU_BAR_FROM];
 
 /** What a place shows, and how. */
 export interface Listing {
@@ -86,12 +88,12 @@ function thumbnailSource(item: Item): { uri: string } | AssetUrlRequest | null {
 
 /**
  * The menus in the window, where the platform has no menu bar of its own and
- * the window is wide enough: alone it follows the window's width, so a resize
- * does not draw the place's whole pane again.
+ * the window is wide enough: it reads the window's width only at that
+ * threshold, so a resize draws nothing until it crosses it.
  */
 function InWindowMenus({ children }: { children: ReactNode }) {
-  const window = useWindowDimensions();
-  if (window.width < MENU_BAR_FROM) return null;
+  const width = useWindowWidthClass(MENU_BAR_WIDTHS);
+  if (width < MENU_BAR_FROM) return null;
   return <View className="flex-row px-2 pb-1">{children}</View>;
 }
 

@@ -13,6 +13,12 @@
  * arithmetic: an item carries no handler, menu or responder of its own. One
  * context menu serves the area: it opens for the item pressed (with the
  * selection it is in), or for the place where the press found none.
+ *
+ * The places are drawn as flex: a column is a share of the width, a picture a
+ * square, so a window resizing moves them in the layout pass and runs no
+ * JavaScript. The view redraws only when the width crosses a threshold (a
+ * grid's columns, the list's), and reads the exact width when a press, a band
+ * or a key acts on the places.
  */
 import {
   ContextMenu,
@@ -23,6 +29,7 @@ import {
 import { isCommandKey } from '@oxy.so/bloom/kbd';
 import { useTheme } from '@oxy.so/bloom/theme';
 import { Text } from '@oxy.so/bloom/typography';
+import { useMeasuredSizeClass } from '@oxy.so/bloom/hooks';
 import { useWindow } from '@oxy.so/bloom/window';
 import {
   type ComponentRef,
@@ -41,16 +48,17 @@ import {
   type NativeSyntheticEvent,
   type PointerEvent,
   ScrollView,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import type { ViewMode } from '@/components/BrowserProvider';
 import { ItemCell } from '@/components/ItemCell';
 import { ItemRow, type RenameHandlers } from '@/components/ItemRow';
-import { ListHeader, type ListColumns } from '@/components/ListHeader';
+import { ListHeader } from '@/components/ListHeader';
 import type { Item } from '@/lib/items';
 import {
+  columnWidthRange,
   contentHeight,
+  GRID_INSET,
   gridColumns,
   type ItemsLayout,
   itemAt,
@@ -58,6 +66,9 @@ import {
   itemsBetween,
   itemsGeometry,
   itemsTouching,
+  layoutWidthThresholds,
+  listColumns,
+  PHOTO_SPACING,
 } from '@/lib/items-layout';
 import {
   type Box,
@@ -82,11 +93,14 @@ const TOUCH_SLOP = 10;
 const LONG_PRESS_MS = 500;
 /** How far past what can be seen the items are drawn, in screens, so a scroll finds them drawn. */
 const OVERSCAN_SCREENS = 1;
-
-/** The list's columns that fit a width: the name always, then date, size and kind as room allows. */
-function columnsFor(width: number): ListColumns {
-  return { date: width >= 420, size: width >= 520, kind: width >= 700 };
-}
+/**
+ * The viewport's height is read in steps of this much: what is drawn covers
+ * the step's top, so a window resizing taller redraws once a step, not on
+ * every pixel.
+ */
+const VIEWPORT_STEP = 256;
+const VIEWPORT_STEPS = Array.from({ length: 64 }, (_, index) => (index + 1) * VIEWPORT_STEP);
+const NO_WIDTHS: number[] = [];
 
 interface Drag {
   keys: readonly string[];
@@ -181,9 +195,12 @@ export function ItemsView({
   onEndReached,
 }: ItemsViewProps) {
   const theme = useTheme();
-  const window = useWindowDimensions();
-  const [width, setWidth] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const isDesktopWindow = useWindow() !== null;
+  // The items' width and the viewport's height, at the thresholds the view
+  // draws differently at; the exact values are read when something acts.
+  const area = useMeasuredSizeClass(layoutWidthThresholds(mode, layout, isDesktopWindow));
+  const viewport = useMeasuredSizeClass(NO_WIDTHS, VIEWPORT_STEPS);
+  const width = area.width;
   // Which stretch of the items is drawn: it moves in steps of half a screen,
   // so scrolling draws again only as it nears what is not drawn yet.
   const [scrollStep, setScrollStep] = useState(0);
@@ -191,16 +208,40 @@ export function ItemsView({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
 
-  const isDesktopWindow = useWindow() !== null;
+  // What is drawn: the columns and rows at the width's threshold (a column's
+  // place is its share of the width, `renderItem`). A picture's square follows
+  // the width, so the rows drawn are those either end of the columns' widths
+  // could show.
   const geometry = itemsGeometry(mode, layout, width, isDesktopWindow);
-  const listColumns = columnsFor(width);
-  const screen = viewportHeight > 0 ? viewportHeight : window.height;
+  const columnsShown = listColumns(width);
+  const screen = viewport.height + VIEWPORT_STEP;
   const stepHeight = Math.max(1, Math.floor(screen / 2));
   const drawnTop = scrollStep * stepHeight - screen * OVERSCAN_SCREENS;
   const drawnBottom = scrollStep * stepHeight + screen * (1 + OVERSCAN_SCREENS);
-  const drawn = itemsBetween(geometry, items.length, drawnTop, drawnBottom);
+  const widths = columnWidthRange(geometry.columns, layout);
+  const drawn =
+    geometry.arrangement === 'photos'
+      ? {
+          start: itemsBetween(
+            itemsGeometry(mode, layout, widths.most - 1, isDesktopWindow),
+            items.length,
+            drawnTop,
+            drawnBottom,
+          ).start,
+          end: itemsBetween(
+            itemsGeometry(mode, layout, widths.least, isDesktopWindow),
+            items.length,
+            drawnTop,
+            drawnBottom,
+          ).end,
+        }
+      : itemsBetween(geometry, items.length, drawnTop, drawnBottom);
   const height = contentHeight(geometry, items.length);
   const rowCount = Math.ceil(items.length / geometry.columns);
+  /** The places at the exact width, for what acts on them (a press, a band, a key). */
+  const exactGeometry = () =>
+    itemsGeometry(mode, layout, area.read()?.width ?? width, isDesktopWindow);
+
   const rename: RenameHandlers = { onText: onRenameText, onDone: onRenameDone };
 
   // An item's accessibility action calls whatever the browser does now; the
@@ -247,7 +288,7 @@ export function ItemsView({
   });
 
   const itemAtPoint = (point: { x: number; y: number }): Item | null => {
-    const index = itemAt(geometry, items.length, point);
+    const index = itemAt(exactGeometry(), items.length, point);
     return index === null ? null : (items[index] ?? null);
   };
   const draggedItems = (keys: readonly string[]) => items.filter((item) => keys.includes(item.key));
@@ -380,7 +421,7 @@ export function ItemsView({
     }
     const box = boxBetween(now.start, point);
     setBand(box);
-    const touched = itemsTouching(geometry, items.length, box).flatMap((index) => {
+    const touched = itemsTouching(exactGeometry(), items.length, box).flatMap((index) => {
       const item = items[index];
       return item ? [item.key] : [];
     });
@@ -430,9 +471,8 @@ export function ItemsView({
   };
 
   const handleLayout = (event: LayoutChangeEvent) => {
-    const next = event.nativeEvent.layout.width;
-    setWidth(next);
-    onColumnsChange(gridColumns(next, layout));
+    area.onLayout(event);
+    onColumnsChange(gridColumns(event.nativeEvent.layout.width, layout));
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -444,19 +484,23 @@ export function ItemsView({
   };
 
   // The item the keys moved to is brought into view, as Finder scrolls to it.
+  // Where it is, at the exact width and height when the focus moves.
   const focusIndex = selection.focus ? items.findIndex((item) => item.key === selection.focus) : -1;
-  const focusFrame = focusIndex >= 0 ? itemFrame(geometry, focusIndex) : null;
-  const focusTop = focusFrame?.y ?? 0;
-  const focusBottom = focusFrame ? focusFrame.y + focusFrame.height : 0;
+  const latestGeometry = useRef(exactGeometry);
+  useLayoutEffect(() => {
+    latestGeometry.current = exactGeometry;
+  });
   useEffect(() => {
-    if (focusIndex < 0 || viewportHeight === 0) return;
+    const visibleHeight = viewport.read()?.height ?? 0;
+    if (focusIndex < 0 || visibleHeight === 0) return;
+    const frame = itemFrame(latestGeometry.current(), focusIndex);
     const top = scrollTop.current;
-    if (focusTop < top) {
-      scroller.current?.scrollTo({ y: focusTop, animated: false });
-    } else if (focusBottom > top + viewportHeight) {
-      scroller.current?.scrollTo({ y: focusBottom - viewportHeight, animated: false });
+    if (frame.y < top) {
+      scroller.current?.scrollTo({ y: frame.y, animated: false });
+    } else if (frame.y + frame.height > top + visibleHeight) {
+      scroller.current?.scrollTo({ y: frame.y + frame.height - visibleHeight, animated: false });
     }
-  }, [focusIndex, focusTop, focusBottom, viewportHeight]);
+  }, [focusIndex, viewport]);
 
   const menuItem = menu?.key ? items.find((item) => item.key === menu.key) : undefined;
 
@@ -478,7 +522,7 @@ export function ItemsView({
           isWindowActive={isWindowActive}
           isDropTarget={isDropTarget}
           rename={itemRename}
-          columns={listColumns}
+          columns={columnsShown}
           hasOriginColumn={hasOriginColumn}
           origin={hasOriginColumn ? originOf(item) : ''}
           thumbnailUrl={thumbnailUrl}
@@ -487,14 +531,17 @@ export function ItemsView({
         />
       );
     }
+    // A column's start and its share of the grid's width (inside its inset):
+    // Yoga places it as the width changes.
+    const column = index % geometry.columns;
     return (
       <ItemCell
         key={item.key}
         item={item}
         layout={layout}
-        left={frame.x}
+        left={`${(column * 100) / geometry.columns}%`}
         top={frame.y}
-        width={frame.width}
+        width={`${100 / geometry.columns}%`}
         height={frame.height}
         layer={rowCount - Math.floor(index / geometry.columns)}
         isSelected={isItemSelected}
@@ -505,6 +552,61 @@ export function ItemsView({
         accessibilityActions={itemActions(item)}
         onAccessibilityAction={handleAccessibilityAction}
       />
+    );
+  };
+
+  /**
+   * Photos' grid, as rows of squares in the flow: each square a column's share
+   * of the width, so its size follows the window in the layout pass. The rows
+   * not drawn are a space as tall as they are, which is a share of the width
+   * too (each row is the width over the columns, less a gap): an aspect ratio,
+   * corrected by the gaps in a margin.
+   */
+  const renderPhotoRows = () => {
+    const columns = geometry.columns;
+    const rowsBefore = Math.floor(drawn.start / columns);
+    const rowsAfter = Math.max(0, rowCount - Math.ceil(drawn.end / columns));
+    const space = (rows: number, side: 'before' | 'after') =>
+      rows > 0 ? (
+        <View
+          key={side}
+          pointerEvents="none"
+          style={{
+            width: '100%',
+            aspectRatio: columns / rows,
+            marginBottom: PHOTO_SPACING * (rows / columns - 1),
+          }}
+        />
+      ) : null;
+    const rows: ReactNode[] = [];
+    for (let start = drawn.start; start < drawn.end; start += columns) {
+      const cells: ReactNode[] = [];
+      for (let index = start; index < start + columns; index += 1) {
+        const item = items[index];
+        cells.push(
+          item ? (
+            renderItem(item, index)
+          ) : (
+            <View key={`empty-${index}`} pointerEvents="none" style={{ flex: 1 }} />
+          ),
+        );
+      }
+      rows.push(
+        <View
+          key={start}
+          pointerEvents="box-none"
+          style={{ flexDirection: 'row', gap: PHOTO_SPACING }}
+        >
+          {cells}
+        </View>,
+      );
+    }
+    return (
+      <View pointerEvents="box-none" style={{ padding: GRID_INSET, gap: PHOTO_SPACING }}>
+        {space(rowsBefore, 'before')}
+        {rows}
+        {space(rowsAfter, 'after')}
+      </View>
     );
   };
 
@@ -521,7 +623,7 @@ export function ItemsView({
             <ListHeader
               order={order}
               onSort={onSort}
-              columns={listColumns}
+              columns={columnsShown}
               dateColumn={dateColumn}
               hasOriginColumn={hasOriginColumn}
             />
@@ -531,14 +633,14 @@ export function ItemsView({
             className="flex-1"
             contentContainerClassName="grow"
             scrollEventThrottle={16}
-            onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
+            onLayout={viewport.onLayout}
             onScroll={handleScroll}
           >
             <View
               ref={content}
               testID="items"
               className="grow"
-              style={{ minHeight: height }}
+              style={geometry.arrangement === 'photos' ? undefined : { minHeight: height }}
               onLayout={measureContent}
               onPointerDown={handlePointerDown}
               onStartShouldSetResponder={() =>
@@ -550,9 +652,28 @@ export function ItemsView({
               onResponderTerminate={handleTerminate}
               onResponderTerminationRequest={() => gesture.current?.isTouch ?? true}
             >
-              {items
-                .slice(drawn.start, drawn.end)
-                .map((item, offset) => renderItem(item, drawn.start + offset))}
+              {geometry.arrangement === 'photos' ? (
+                renderPhotoRows()
+              ) : geometry.arrangement === 'icons' ? (
+                <View
+                  pointerEvents="box-none"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: GRID_INSET,
+                    right: GRID_INSET,
+                  }}
+                >
+                  {items
+                    .slice(drawn.start, drawn.end)
+                    .map((item, offset) => renderItem(item, drawn.start + offset))}
+                </View>
+              ) : (
+                items
+                  .slice(drawn.start, drawn.end)
+                  .map((item, offset) => renderItem(item, drawn.start + offset))
+              )}
               {items.length === 0 ? (
                 <View pointerEvents="box-none" className="absolute inset-x-0 top-20 items-center">
                   {emptyState}

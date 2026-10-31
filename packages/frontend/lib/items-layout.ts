@@ -4,6 +4,12 @@
  * the width, or Photos' grid of square pictures. Every item's place is known
  * without drawing it, so the view draws only the items that can be seen, and a
  * press, a rubber band or a drag finds the item under it by arithmetic.
+ *
+ * The view draws the same places as flex (`gridPlacement`): a column's share
+ * of the width, a picture's square, so a window resizing moves the items in
+ * the layout pass, with no JavaScript. Only what changes at a threshold of the
+ * width redraws: a grid's columns, the list's columns, its rows' height
+ * (`layoutWidthThresholds`).
  */
 import { type Box, intersects } from '@/lib/selection';
 
@@ -72,7 +78,7 @@ export function itemsGeometry(
   const columns = gridColumns(width, layout);
   const usable = Math.max(width - GRID_PADDING * 2, 0);
   if (layout === 'photos') {
-    const size = Math.max(1, Math.floor((usable - PHOTO_GAP * (columns - 1)) / columns));
+    const size = Math.max(1, (usable - PHOTO_GAP * (columns - 1)) / columns);
     return {
       arrangement: 'photos',
       columns,
@@ -84,8 +90,9 @@ export function itemsGeometry(
       originY: GRID_PADDING,
     };
   }
-  // The room left over is shared between the columns, as Finder spreads its icons.
-  const pitch = Math.max(ICON_CELL.width, Math.floor(usable / columns));
+  // The room left over is shared between the columns, as Finder spreads its
+  // icons: each column an equal share, as the view draws it (`gridPlacement`).
+  const pitch = Math.max(ICON_CELL.width, usable / columns);
   return {
     arrangement: 'icons',
     columns,
@@ -195,4 +202,51 @@ export function itemsTouching(geometry: ItemsGeometry, count: number, band: Box)
     if (itemTargets(geometry, index).some((box) => intersects(box, band))) touched.push(index);
   }
   return touched;
+}
+
+/** The widths at which what the view draws changes (`useMeasuredSizeClass` in the view). */
+export function layoutWidthThresholds(
+  mode: 'icons' | 'list',
+  layout: ItemsLayout,
+  isDesktopWindow: boolean,
+): number[] {
+  if (mode === 'list')
+    return [...LIST_COLUMN_WIDTHS, ...(isDesktopWindow ? [] : [TOUCH_LIST_BELOW])];
+  const thresholds: number[] = [];
+  for (let columns = 2; columns <= MAX_COLUMNS; columns += 1) {
+    thresholds.push(
+      layout === 'photos'
+        ? PHOTO_MIN_SIZE * columns - PHOTO_GAP + GRID_PADDING * 2
+        : ICON_CELL.width * columns + GRID_PADDING * 2,
+    );
+  }
+  return thresholds;
+}
+
+/** The list's columns that fit a width: the name always, then date, size and kind as room allows. */
+export function listColumns(width: number): { date: boolean; size: boolean; kind: boolean } {
+  return { date: width >= 420, size: width >= 520, kind: width >= 700 };
+}
+const LIST_COLUMN_WIDTHS = [420, 520, 700];
+/** The most columns a grid is laid out with: a window this wide is wider than any screen. */
+const MAX_COLUMNS = 64;
+
+/** The grid's padding, for the view's flex placement. */
+export const GRID_INSET = GRID_PADDING;
+export const PHOTO_SPACING = PHOTO_GAP;
+
+/**
+ * The widths a grid's places can have while it keeps `columns`: from the width
+ * that first holds them to the one that holds one more. The view, drawing from
+ * columns alone, draws every item either bound could show.
+ */
+export function columnWidthRange(
+  columns: number,
+  layout: ItemsLayout,
+): { least: number; most: number } {
+  const width = (count: number) =>
+    layout === 'photos'
+      ? PHOTO_MIN_SIZE * count - PHOTO_GAP + GRID_PADDING * 2
+      : ICON_CELL.width * count + GRID_PADDING * 2;
+  return { least: width(columns), most: width(columns + 1) };
 }
