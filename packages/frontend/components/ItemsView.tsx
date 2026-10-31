@@ -30,6 +30,7 @@ import {
   ContextMenuTrigger,
 } from '@oxy.so/bloom/context-menu';
 import { isCommandKey } from '@oxy.so/bloom/kbd';
+import { usePlatformSurfaces } from '@oxy.so/bloom/platform-surface';
 import { useTheme } from '@oxy.so/bloom/theme';
 import { Text } from '@oxy.so/bloom/typography';
 import { useMeasuredSizeClass } from '@oxy.so/bloom/hooks';
@@ -200,10 +201,12 @@ export function ItemsView({
   onEndReached,
 }: ItemsViewProps) {
   const theme = useTheme();
-  const isDesktopWindow = useWindow() !== null;
+  // A pointer drives a desktop window, and a platform's sheet that reports the pointer.
+  const surfaces = usePlatformSurfaces();
+  const isPointerDriven = useWindow() !== null || (surfaces?.capabilities.has('pointer') ?? false);
   // The items' width and the viewport's height, at the thresholds the view
   // draws differently at; the exact values are read when something acts.
-  const area = useMeasuredSizeClass(layoutWidthThresholds(mode, layout, isDesktopWindow));
+  const area = useMeasuredSizeClass(layoutWidthThresholds(mode, layout, isPointerDriven));
   const viewport = useMeasuredSizeClass(NO_WIDTHS, VIEWPORT_STEPS);
   const width = area.width;
   // Which stretch of the items is drawn: it moves in steps of half a screen,
@@ -217,7 +220,7 @@ export function ItemsView({
   // place is its share of the width, `renderItem`). A picture's square follows
   // the width, so the rows drawn are those either end of the columns' widths
   // could show.
-  const geometry = itemsGeometry(mode, layout, width, isDesktopWindow);
+  const geometry = itemsGeometry(mode, layout, width, isPointerDriven);
   const columnsShown = listColumns(width);
   const screen = viewport.height + VIEWPORT_STEP;
   const stepHeight = Math.max(1, Math.floor(screen / 2));
@@ -228,13 +231,13 @@ export function ItemsView({
     geometry.arrangement === 'photos'
       ? {
           start: itemsBetween(
-            itemsGeometry(mode, layout, widths.most - 1, isDesktopWindow),
+            itemsGeometry(mode, layout, widths.most - 1, isPointerDriven),
             items.length,
             drawnTop,
             drawnBottom,
           ).start,
           end: itemsBetween(
-            itemsGeometry(mode, layout, widths.least, isDesktopWindow),
+            itemsGeometry(mode, layout, widths.least, isPointerDriven),
             items.length,
             drawnTop,
             drawnBottom,
@@ -245,7 +248,7 @@ export function ItemsView({
   const rowCount = Math.ceil(items.length / geometry.columns);
   /** The places at the exact width, for what acts on them (a press, a band, a key). */
   const exactGeometry = () =>
-    itemsGeometry(mode, layout, area.read()?.width ?? width, isDesktopWindow);
+    itemsGeometry(mode, layout, area.read()?.width ?? width, isPointerDriven);
 
   const rename: RenameHandlers = { onText: onRenameText, onDone: onRenameDone };
 

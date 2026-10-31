@@ -27,7 +27,8 @@ const PHOTO_MIN_SIZE = 110;
 const PHOTO_GAP = 2;
 /**
  * The list's rows: a desktop's compact rows, a phone's touch-sized ones below
- * this width. A desktop window is driven by a pointer at any width.
+ * this width. A platform a pointer drives (a desktop window, or the file
+ * chooser's sheet) is a desktop at any width.
  */
 const COMPACT_ROW_HEIGHT = 28;
 const TOUCH_ROW_HEIGHT = 44;
@@ -59,11 +60,11 @@ export function itemsGeometry(
   mode: 'icons' | 'list',
   layout: ItemsLayout,
   width: number,
-  isDesktopWindow = false,
+  isPointerDriven = false,
 ): ItemsGeometry {
   if (mode === 'list') {
     const rowHeight =
-      !isDesktopWindow && width < TOUCH_LIST_BELOW ? TOUCH_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
+      !isPointerDriven && width < TOUCH_LIST_BELOW ? TOUCH_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
     return {
       arrangement: 'list',
       columns: 1,
@@ -208,10 +209,10 @@ export function itemsTouching(geometry: ItemsGeometry, count: number, band: Box)
 export function layoutWidthThresholds(
   mode: 'icons' | 'list',
   layout: ItemsLayout,
-  isDesktopWindow: boolean,
+  isPointerDriven: boolean,
 ): number[] {
   if (mode === 'list')
-    return [...LIST_COLUMN_WIDTHS, ...(isDesktopWindow ? [] : [TOUCH_LIST_BELOW])];
+    return [...LIST_COLUMN_WIDTHS, ...(isPointerDriven ? [] : [TOUCH_LIST_BELOW])];
   const thresholds: number[] = [];
   for (let columns = 2; columns <= MAX_COLUMNS; columns += 1) {
     thresholds.push(
