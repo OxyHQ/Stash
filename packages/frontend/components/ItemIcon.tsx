@@ -117,11 +117,30 @@ export interface ItemIconProps {
   thumbnailUrl: string | null;
   /** Fill the square with the picture (Photos' grid) rather than fit it (Finder's icons). */
   isCropped?: boolean;
+  /**
+   * Fill the box it is in (Photos' square, whose size follows the window), the
+   * picture across all of it and anything else at `size` in its middle.
+   */
+  isFilling?: boolean;
   /** Names the picture, whose loading React hears (it falls back to the page when it fails). */
   testID?: string;
 }
 
-export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false, testID }: ItemIconProps) {
+export function ItemIcon({
+  kind,
+  size,
+  thumbnailUrl,
+  isCropped = false,
+  isFilling = false,
+  testID,
+}: ItemIconProps) {
+  if (isFilling && !(thumbnailUrl && (kind === 'image' || kind === 'video'))) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ItemIcon kind={kind} size={size} thumbnailUrl={thumbnailUrl} isCropped={isCropped} />
+      </View>
+    );
+  }
   if (kind === 'folder') {
     return (
       <Image
@@ -143,6 +162,7 @@ export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false, testID }
         kind={kind}
         size={size}
         isCropped={isCropped}
+        isFilling={isFilling}
         testID={testID}
       />
     );
@@ -155,20 +175,34 @@ function Thumbnail({
   kind,
   size,
   isCropped,
+  isFilling,
   testID,
 }: {
   uri: string;
   kind: Kind;
   size: number;
   isCropped: boolean;
+  isFilling: boolean;
   testID: string | undefined;
 }) {
   const [hasFailed, setHasFailed] = useState(false);
-  if (hasFailed) return <PageArt size={size} kind={kind} />;
+  if (hasFailed) {
+    return isFilling ? (
+      <View className="flex-1 items-center justify-center">
+        <PageArt size={size} kind={kind} />
+      </View>
+    ) : (
+      <PageArt size={size} kind={kind} />
+    );
+  }
   return (
     <Image
       source={{ uri }}
-      style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
+      style={
+        isFilling
+          ? { width: '100%', height: '100%', borderRadius: isCropped ? 0 : 4 }
+          : { width: size, height: size, borderRadius: isCropped ? 0 : 4 }
+      }
       resizeMode={isCropped ? 'cover' : 'contain'}
       accessible={false}
       onError={() => setHasFailed(true)}

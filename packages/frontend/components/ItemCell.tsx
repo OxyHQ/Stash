@@ -1,7 +1,8 @@
 /**
  * An item in a grid: Finder's icon over its name, or Photos' picture filling
- * its square. It draws itself where the grid places it and again only when
- * something it shows changes.
+ * its square. It draws itself where the grid places it (a column's share of
+ * the width, so a resize moves it with no drawing; a picture's square in its
+ * row) and again only when something it shows changes.
  *
  * A name runs to two lines, its last cut short where it is longer (a platform
  * cuts the middle of one line only); selected, it is shown whole, over the
@@ -9,7 +10,12 @@
  */
 import { Text } from '@oxy.so/bloom/typography';
 import { memo } from 'react';
-import { type AccessibilityActionEvent, type AccessibilityActionInfo, View } from 'react-native';
+import {
+  type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
+  type DimensionValue,
+  View,
+} from 'react-native';
 import { ItemIcon } from '@/components/ItemIcon';
 import type { RenameHandlers } from '@/components/ItemRow';
 import { RenameField } from '@/components/RenameField';
@@ -19,9 +25,10 @@ import { ICON_CELL, type ItemsLayout } from '@/lib/items-layout';
 export interface ItemCellProps {
   item: Item;
   layout: ItemsLayout;
-  left: number;
+  /** An icon's cell: its column's start and share of the grid's width, its row's top. A picture fills its square in its row. */
+  left: DimensionValue;
   top: number;
-  width: number;
+  width: DimensionValue;
   height: number;
   /**
    * Where it is stacked: a row above the rows after it, so a selected name
@@ -69,12 +76,13 @@ export const ItemCell = memo(function ItemCell({
   };
   if (layout === 'photos') {
     return (
-      <View {...accessibility} className="absolute bg-muted" style={{ left, top, width, height }}>
+      <View {...accessibility} className="bg-muted" style={{ flex: 1, aspectRatio: 1 }}>
         <ItemIcon
           kind={kind}
-          size={width}
+          size={ICON_CELL.icon}
           thumbnailUrl={thumbnailUrl}
           isCropped
+          isFilling
           testID={`thumbnail-${item.name}`}
         />
         {isSelected || isDropTarget ? (

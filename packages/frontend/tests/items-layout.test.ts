@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  columnWidthRange,
   contentHeight,
   gridColumns,
   ICON_CELL,
@@ -8,6 +9,8 @@ import {
   itemsBetween,
   itemsGeometry,
   itemsTouching,
+  layoutWidthThresholds,
+  listColumns,
 } from '@/lib/items-layout';
 
 describe('the list', () => {
@@ -79,5 +82,36 @@ describe('a folder of thousands', () => {
     expect(range.start).toBe(0);
     expect(range.end % grid.columns).toBe(0);
     expect(range.end).toBe(Math.ceil((600 - 12) / ICON_CELL.height) * grid.columns);
+  });
+});
+
+describe('what the view redraws for as the window resizes', () => {
+  test("a grid's columns change only at its thresholds", () => {
+    for (const layout of ['files', 'photos'] as const) {
+      const thresholds = layoutWidthThresholds('icons', layout, true);
+      for (let width = 200; width < 2000; width += 1) {
+        const crossed = thresholds.includes(width);
+        expect(gridColumns(width, layout) !== gridColumns(width - 1, layout)).toBe(crossed);
+      }
+    }
+  });
+
+  test("the list's columns change only at its thresholds, its rows' height too off a desktop", () => {
+    const desktop = layoutWidthThresholds('list', 'files', true);
+    const phone = layoutWidthThresholds('list', 'files', false);
+    for (let width = 200; width < 1200; width += 1) {
+      const columnsChange =
+        JSON.stringify(listColumns(width)) !== JSON.stringify(listColumns(width - 1));
+      expect(columnsChange).toBe(desktop.includes(width));
+      const rows = (at: number) => itemsGeometry('list', 'files', at, false).pitchY;
+      expect(columnsChange || rows(width) !== rows(width - 1)).toBe(phone.includes(width));
+    }
+  });
+
+  test('the widths a grid keeps its columns at', () => {
+    const { least, most } = columnWidthRange(gridColumns(1042, 'files'), 'files');
+    expect(gridColumns(least, 'files')).toBe(gridColumns(1042, 'files'));
+    expect(gridColumns(most - 1, 'files')).toBe(gridColumns(1042, 'files'));
+    expect(gridColumns(most, 'files')).toBe(gridColumns(1042, 'files') + 1);
   });
 });
