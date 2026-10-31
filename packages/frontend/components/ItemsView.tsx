@@ -19,6 +19,9 @@
  * JavaScript. The view redraws only when the width crosses a threshold (a
  * grid's columns, the list's), and reads the exact width when a press, a band
  * or a key acts on the places.
+ *
+ * Items the window cannot select now (the file chooser's, that the request
+ * cannot take) are drawn dimmed.
  */
 import {
   ContextMenu,
@@ -27,6 +30,7 @@ import {
   ContextMenuTrigger,
 } from '@oxy.so/bloom/context-menu';
 import { isCommandKey } from '@oxy.so/bloom/kbd';
+import { usePlatformSurfaces } from '@oxy.so/bloom/platform-surface';
 import { useTheme } from '@oxy.so/bloom/theme';
 import { Text } from '@oxy.so/bloom/typography';
 import { useMeasuredSizeClass } from '@oxy.so/bloom/hooks';
@@ -154,8 +158,10 @@ export interface ItemsViewProps {
   onAction: (item: Item, action: string) => void;
   /** An item's actions for assistive technology; the same list for items alike. */
   itemActions: (item: Item) => readonly AccessibilityActionInfo[];
-  itemMenu: (item: Item) => ReactNode;
-  backgroundMenu: ReactNode;
+  /** The context menu's rows for an item and for the place; null: the view has no context menu. */
+  menus: { item: (item: Item) => ReactNode; background: ReactNode } | null;
+  /** Items drawn dimmed: there, but not selectable now. */
+  dimmedKeys: ReadonlySet<string>;
   emptyState: ReactNode;
   /**
    * The grid's columns at the width it was laid out at, for the arrows' steps
@@ -188,17 +194,19 @@ export function ItemsView({
   onDrop,
   onAction,
   itemActions,
-  itemMenu,
-  backgroundMenu,
+  menus,
+  dimmedKeys,
   emptyState,
   onColumnsChange,
   onEndReached,
 }: ItemsViewProps) {
   const theme = useTheme();
-  const isDesktopWindow = useWindow() !== null;
+  // A pointer drives a desktop window, and a platform's sheet that reports the pointer.
+  const surfaces = usePlatformSurfaces();
+  const isPointerDriven = useWindow() !== null || (surfaces?.capabilities.has('pointer') ?? false);
   // The items' width and the viewport's height, at the thresholds the view
   // draws differently at; the exact values are read when something acts.
-  const area = useMeasuredSizeClass(layoutWidthThresholds(mode, layout, isDesktopWindow));
+  const area = useMeasuredSizeClass(layoutWidthThresholds(mode, layout, isPointerDriven));
   const viewport = useMeasuredSizeClass(NO_WIDTHS, VIEWPORT_STEPS);
   const width = area.width;
   // Which stretch of the items is drawn: it moves in steps of half a screen,
@@ -212,7 +220,7 @@ export function ItemsView({
   // place is its share of the width, `renderItem`). A picture's square follows
   // the width, so the rows drawn are those either end of the columns' widths
   // could show.
-  const geometry = itemsGeometry(mode, layout, width, isDesktopWindow);
+  const geometry = itemsGeometry(mode, layout, width, isPointerDriven);
   const columnsShown = listColumns(width);
   const screen = viewport.height + VIEWPORT_STEP;
   const stepHeight = Math.max(1, Math.floor(screen / 2));
@@ -223,13 +231,13 @@ export function ItemsView({
     geometry.arrangement === 'photos'
       ? {
           start: itemsBetween(
-            itemsGeometry(mode, layout, widths.most - 1, isDesktopWindow),
+            itemsGeometry(mode, layout, widths.most - 1, isPointerDriven),
             items.length,
             drawnTop,
             drawnBottom,
           ).start,
           end: itemsBetween(
-            itemsGeometry(mode, layout, widths.least, isDesktopWindow),
+            itemsGeometry(mode, layout, widths.least, isPointerDriven),
             items.length,
             drawnTop,
             drawnBottom,
@@ -240,7 +248,7 @@ export function ItemsView({
   const rowCount = Math.ceil(items.length / geometry.columns);
   /** The places at the exact width, for what acts on them (a press, a band, a key). */
   const exactGeometry = () =>
-    itemsGeometry(mode, layout, area.read()?.width ?? width, isDesktopWindow);
+    itemsGeometry(mode, layout, area.read()?.width ?? width, isPointerDriven);
 
   const rename: RenameHandlers = { onText: onRenameText, onDone: onRenameDone };
 
@@ -368,7 +376,7 @@ export function ItemsView({
   };
 
   const openMenu = (anchor: ContextMenuAnchor | null) => {
-    setMenu(anchor ? { anchor, key: menuTarget.current } : null);
+    setMenu(anchor && menus ? { anchor, key: menuTarget.current } : null);
   };
 
   const handleGrant = (event: GestureResponderEvent) => {
@@ -519,6 +527,7 @@ export function ItemsView({
           height={frame.height}
           isStriped={index % 2 === 1}
           isSelected={isItemSelected}
+          isDimmed={dimmedKeys.has(item.key)}
           isWindowActive={isWindowActive}
           isDropTarget={isDropTarget}
           rename={itemRename}
@@ -545,6 +554,7 @@ export function ItemsView({
         height={frame.height}
         layer={rowCount - Math.floor(index / geometry.columns)}
         isSelected={isItemSelected}
+        isDimmed={dimmedKeys.has(item.key)}
         isWindowActive={isWindowActive}
         isDropTarget={isDropTarget}
         rename={itemRename}
@@ -704,7 +714,9 @@ export function ItemsView({
           </ScrollView>
         </View>
       </ContextMenuTrigger>
-      <ContextMenuContent>{menuItem ? itemMenu(menuItem) : backgroundMenu}</ContextMenuContent>
+      <ContextMenuContent>
+        {menus ? (menuItem ? menus.item(menuItem) : menus.background) : null}
+      </ContextMenuContent>
     </ContextMenu>
   );
 }

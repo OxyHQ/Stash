@@ -14,6 +14,7 @@ import {
   RiMusic2Line,
   RiSmartphoneLine,
 } from '@oxy.so/bloom/icons';
+import { usePlatformFiles } from '@oxy.so/bloom/platform-surface';
 import type { SidebarIcon, SidebarTree } from '@oxy.so/bloom/sidebar';
 import { useAlbums } from '@/hooks/use-albums';
 import { useLocale } from '@/hooks/use-locale';
@@ -37,7 +38,9 @@ const PLACE_ICONS: Record<LocalPlace['kind'], SidebarIcon> = {
  * The sidebar, as Finder's: Favourites (the home and its standard folders, or
  * this device's folder), Oxy (Oxy Files and Photos), the albums, and
  * Locations (the volumes and the Trash). Each row's key is the location it
- * opens.
+ * opens. As the file chooser it holds the places on this device alone, where
+ * what can be chosen is: Oxy Files, Photos, the albums and the Trash hold no
+ * file the asking application could open.
  */
 export function useSidebarTree(
   places: readonly LocalPlace[],
@@ -46,6 +49,7 @@ export function useSidebarTree(
   const { strings } = useLocale();
   const { isSignedIn } = useViewer();
   const albums = useAlbums();
+  const isChooser = usePlatformFiles()?.chooser !== undefined;
   const locations = new Map<string, Location>();
   const row = (location: Location, label: string, icon: SidebarIcon) => {
     const key = locationKey(location);
@@ -64,6 +68,18 @@ export function useSidebarTree(
         row({ kind: 'folder', uri: place.uri }, place.name, PLACE_ICONS[place.kind]),
       ),
     });
+  }
+  if (isChooser) {
+    if (volumes.length > 0) {
+      tree.push({
+        key: 'locations',
+        label: strings.sections.locations,
+        items: volumes.map((place) =>
+          row({ kind: 'folder', uri: place.uri }, place.name, PLACE_ICONS.volume),
+        ),
+      });
+    }
+    return { tree, locations };
   }
   tree.push({
     key: 'oxy',

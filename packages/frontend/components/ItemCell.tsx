@@ -37,6 +37,8 @@ export interface ItemCellProps {
    */
   layer: number;
   isSelected: boolean;
+  /** There, but not selectable now (the file chooser's, that the request cannot take). */
+  isDimmed: boolean;
   isWindowActive: boolean;
   isDropTarget: boolean;
   /** The name's field, while the name is being edited. */
@@ -55,6 +57,7 @@ export const ItemCell = memo(function ItemCell({
   height,
   layer,
   isSelected,
+  isDimmed,
   isWindowActive,
   isDropTarget,
   rename,
@@ -70,13 +73,18 @@ export const ItemCell = memo(function ItemCell({
     accessibilityRole: 'listitem' as const,
     accessibilityLabel: item.name,
     'aria-selected': isSelected,
+    'aria-disabled': isDimmed,
     accessibilityActions,
     onAccessibilityAction: (event: AccessibilityActionEvent) =>
       onAccessibilityAction(item, event.nativeEvent.actionName),
   };
   if (layout === 'photos') {
     return (
-      <View {...accessibility} className="bg-muted" style={{ flex: 1, aspectRatio: 1 }}>
+      <View
+        {...accessibility}
+        className={`bg-muted ${isDimmed ? 'opacity-50' : ''}`}
+        style={{ flex: 1, aspectRatio: 1 }}
+      >
         <ItemIcon
           kind={kind}
           size={ICON_CELL.icon}
@@ -104,7 +112,7 @@ export const ItemCell = memo(function ItemCell({
   return (
     <View
       {...accessibility}
-      className="absolute select-none items-center gap-1 pt-1.5"
+      className={`absolute select-none items-center gap-1 pt-1.5 ${isDimmed ? 'opacity-50' : ''}`}
       style={{ left, top, width, height, zIndex: layer }}
     >
       <View

@@ -26,6 +26,8 @@ export interface ItemRowProps {
   height: number;
   isStriped: boolean;
   isSelected: boolean;
+  /** There, but not selectable now (the file chooser's, that the request cannot take). */
+  isDimmed: boolean;
   isWindowActive: boolean;
   isDropTarget: boolean;
   /** The name's field, while the name is being edited. */
@@ -44,6 +46,7 @@ export const ItemRow = memo(function ItemRow({
   height,
   isStriped,
   isSelected,
+  isDimmed,
   isWindowActive,
   isDropTarget,
   rename,
@@ -77,9 +80,10 @@ export const ItemRow = memo(function ItemRow({
       accessibilityRole="listitem"
       accessibilityLabel={item.name}
       aria-selected={isSelected}
+      aria-disabled={isDimmed}
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction(item, event.nativeEvent.actionName)}
-      className={`absolute inset-x-2.5 select-none flex-row items-center rounded-[6px] px-2 ${rowClass}`}
+      className={`absolute inset-x-2.5 select-none flex-row items-center rounded-[6px] px-2 ${rowClass} ${isDimmed ? 'opacity-50' : ''}`}
       style={{ top, height }}
     >
       <ItemIcon

@@ -7,8 +7,13 @@
  * into its edge by its dock, peeking back), the panel's toolbar is the
  * window's title area, and the window is never made smaller than Stash's
  * layout holds together at; on a phone the sidebar is the shell's drawer.
+ *
+ * As the file chooser the window is a sheet of the asking application's
+ * window: its sidebar holds the places on this device, always beside the
+ * items, with neither Stash's mark nor the Oxy account.
  */
 import { AppShell } from '@oxy.so/bloom/app-shell';
+import { usePlatformFiles } from '@oxy.so/bloom/platform-surface';
 import { useWindowSizeLimits } from '@oxy.so/bloom/window';
 import { ProfileButton } from '@oxy.so/services/ui/client';
 import { Slot, usePathname } from 'expo-router';
@@ -31,6 +36,8 @@ const SIDEBAR_WIDTH = 220;
  * the toolbar and the bars under it.
  */
 const WINDOW_MIN = { minWidth: 640, minHeight: 400 };
+/** The chooser's smallest: the same, with room for its bar of buttons under the items. */
+const CHOOSER_MIN = { minWidth: 640, minHeight: 440 };
 
 export function BrowserShell() {
   const { location, navigate, isNewAlbumOpen, setNewAlbumOpen } = useBrowser();
@@ -40,7 +47,8 @@ export function BrowserShell() {
   const { isSignedIn } = useViewer();
   const albumActions = useAlbumActions();
   const pathname = usePathname();
-  useWindowSizeLimits(WINDOW_MIN);
+  const isChooser = usePlatformFiles()?.chooser !== undefined;
+  useWindowSizeLimits(isChooser ? CHOOSER_MIN : WINDOW_MIN);
   return (
     <>
       <AppShell
@@ -51,6 +59,8 @@ export function BrowserShell() {
         gutter={8}
         contentMaxWidth="none"
         drawer="reveal"
+        // A panel's places are always beside its items, however narrow the sheet.
+        {...(isChooser ? { navFrom: 0 } : null)}
         sidebar={{
           surface: 'plain',
           variant: 'panel',
@@ -59,16 +69,18 @@ export function BrowserShell() {
           collapsed: false,
           collapseDisabled: true,
           width: SIDEBAR_WIDTH,
-          logo: {
-            icon: (
-              <Image source={STASH_MARK} className="h-7 w-7 rounded-[7px]" accessible={false} />
-            ),
-            wordmark: strings.appName,
-            onPress: () => {
-              const home = places.find((place) => place.kind === 'home');
-              if (home) navigate({ kind: 'folder', uri: home.uri });
-            },
-          },
+          logo: isChooser
+            ? undefined
+            : {
+                icon: (
+                  <Image source={STASH_MARK} className="h-7 w-7 rounded-[7px]" accessible={false} />
+                ),
+                wordmark: strings.appName,
+                onPress: () => {
+                  const home = places.find((place) => place.kind === 'home');
+                  if (home) navigate({ kind: 'folder', uri: home.uri });
+                },
+              },
           showSearch: false,
           showThemeToggle: false,
           tree,
@@ -77,9 +89,10 @@ export function BrowserShell() {
             const target = locations.get(item.key);
             if (target) navigate(target);
           },
-          footer: isSignedIn
-            ? ({ collapsed }) => <ProfileButton expanded={!collapsed} placement="up" />
-            : undefined,
+          footer:
+            isSignedIn && !isChooser
+              ? ({ collapsed }) => <ProfileButton expanded={!collapsed} placement="up" />
+              : undefined,
           dock: { peek: true },
         }}
         panelLayout={{

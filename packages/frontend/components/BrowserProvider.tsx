@@ -2,8 +2,11 @@
  * The window's own state, kept across the places it shows: where it is (the
  * route) and was (back and forward), how it shows items (icons or a list,
  * per kind of place), their order, whether hidden files show, and the album
- * name dialog the sidebar and the menus open, and its preview pane.
+ * name dialog the sidebar and the menus open, and its preview pane; as the
+ * file chooser's save panel, the name being typed, kept as it goes from
+ * folder to folder.
  */
+import { usePlatformFiles } from '@oxy.so/bloom/platform-surface';
 import { router, useGlobalSearchParams, usePathname } from 'expo-router';
 import { createContext, type ReactNode, use, useState } from 'react';
 import {
@@ -54,6 +57,9 @@ interface BrowserValue {
   /** The preview pane's width, as the person last dragged it, in every place. */
   previewWidth: number;
   setPreviewWidth: (width: number) => void;
+  /** The save panel's name, from the asking application's suggestion until the person types. */
+  saveName: string;
+  setSaveName: (name: string) => void;
 }
 
 /** The preview pane's width until the person drags it, Finder's. */
@@ -80,6 +86,8 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
   const [isNewAlbumOpen, setNewAlbumOpen] = useState(false);
   const [isPreviewShown, setPreviewShown] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(PREVIEW_WIDTH);
+  const suggestedName = usePlatformFiles()?.chooser?.request.suggestedName ?? '';
+  const [saveName, setSaveName] = useState(suggestedName);
 
   // The route is where the window is; the history follows it however it got
   // there (a press here, the browser's own back, a phone's back gesture).
@@ -127,6 +135,8 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     setPreviewShown,
     previewWidth,
     setPreviewWidth,
+    saveName,
+    setSaveName,
   };
   return <BrowserContext value={value}>{children}</BrowserContext>;
 }

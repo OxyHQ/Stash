@@ -17,7 +17,7 @@ export function StatusBar({
   onPath,
 }: {
   text: string;
-  /** The folders down to this one, for a place on this device; empty elsewhere. */
+  /** The folders down to this one, for a place on this device; empty where none is shown. */
   path: readonly { name: string; uri: string }[];
   onPath: (uri: string) => void;
 }) {
@@ -30,7 +30,7 @@ export function StatusBar({
       className="border-t border-border"
       style={{ paddingBottom: panel.framed ? 0 : insets.bottom }}
     >
-      {path.length > 1 ? (
+      {path.length > 0 ? (
         <View className="min-h-7 justify-center border-b border-border px-3">
           <Breadcrumb size="sm" overflow="collapse" accessibilityLabel={strings.path} testID="path">
             {path.map((part, index) => (
