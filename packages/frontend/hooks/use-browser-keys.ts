@@ -22,7 +22,7 @@ import {
 export function useBrowserKeys({
   isEnabled,
   viewMode,
-  columns,
+  getColumns,
   shown,
   onSelectionChange,
   commands,
@@ -33,7 +33,8 @@ export function useBrowserKeys({
 }: {
   isEnabled: boolean;
   viewMode: ViewMode;
-  columns: number;
+  /** The grid's columns now, read as a key moves down or up it. */
+  getColumns: () => number;
   shown: readonly Item[];
   onSelectionChange: (change: (selection: Selection) => Selection) => void;
   commands: Commands;
@@ -57,10 +58,10 @@ export function useBrowserKeys({
           commands.open.run();
           return true;
         }
-        return step(viewMode === 'list' ? 1 : columns);
+        return step(viewMode === 'list' ? 1 : getColumns());
       case 'ArrowUp':
         if (isCommand) return false;
-        return step(viewMode === 'list' ? -1 : -columns);
+        return step(viewMode === 'list' ? -1 : -getColumns());
       case 'ArrowRight':
         return viewMode === 'icons' ? step(1) : false;
       case 'ArrowLeft':

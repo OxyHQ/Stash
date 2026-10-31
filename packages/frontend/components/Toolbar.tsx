@@ -11,6 +11,7 @@ import { ButtonGroup, ButtonGroupItem } from '@oxy.so/bloom/button-group';
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
+  RiInformationLine,
   RiLayoutGridLine,
   RiListView,
   RiSearchLine,
@@ -34,6 +35,8 @@ export function Toolbar({
   canGoForward,
   onBack,
   onForward,
+  isPreviewShown,
+  onPreviewShown,
   onUpload,
 }: {
   title: string;
@@ -45,6 +48,8 @@ export function Toolbar({
   canGoForward: boolean;
   onBack: () => void;
   onForward: () => void;
+  isPreviewShown: boolean;
+  onPreviewShown: (isShown: boolean) => void;
   /** Uploading what the person picks, where that is how files reach Oxy Files here. */
   onUpload: (() => void) | null;
 }) {
@@ -123,6 +128,16 @@ export function Toolbar({
               selected={viewMode === 'list'}
               onPress={() => onViewMode('list')}
               testID="view-list"
+            />
+            <ButtonGroupItem
+              iconOnly
+              leadingIcon={RiInformationLine}
+              accessibilityLabel={
+                isPreviewShown ? strings.menus.hidePreview : strings.menus.showPreview
+              }
+              selected={isPreviewShown}
+              onPress={() => onPreviewShown(!isPreviewShown)}
+              testID="preview-toggle"
             />
           </ButtonGroup>
           {compact && !isSearchOpen && search === '' ? (

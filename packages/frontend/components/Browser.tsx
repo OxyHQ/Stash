@@ -6,14 +6,16 @@
  * listing holds and what can be done to it differ.
  */
 import { AlertDialog } from '@oxy.so/bloom/alert-dialog';
+import { type AppShellPanelDefinition, AppShellPanels } from '@oxy.so/bloom/app-shell';
 import { EmptyState } from '@oxy.so/bloom/empty-state';
 import type { BloomIconComponent } from '@oxy.so/bloom/icons';
 import { Loading } from '@oxy.so/bloom/loading';
 import { usePlatformMenuBar } from '@oxy.so/bloom/platform-surface';
 import { Screen } from '@oxy.so/bloom/screen';
+import { Text } from '@oxy.so/bloom/typography';
 import { useWindow } from '@oxy.so/bloom/window';
 import type { Album } from '@stash/shared-types';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import { AlbumNameDialog } from '@/components/AlbumNameDialog';
 import { BrowserMenus } from '@/components/BrowserMenus';
@@ -21,6 +23,7 @@ import { useBrowser } from '@/components/BrowserProvider';
 import { BackgroundMenuRows, ItemMenuRows } from '@/components/ItemMenus';
 import { ItemsView } from '@/components/ItemsView';
 import { PreviewDialog } from '@/components/PreviewDialog';
+import { PreviewPane } from '@/components/PreviewPane';
 import { SignInPanel } from '@/components/SignInPanel';
 import { StatusBar } from '@/components/StatusBar';
 import { Toolbar } from '@/components/Toolbar';
@@ -33,13 +36,16 @@ import { useLocalPlaces } from '@/hooks/use-local-places';
 import { selectionOnArrival } from '@/lib/history';
 import { previewOnPlatform } from '@/lib/local-files';
 import { type Item, itemKind, type LocalItem, type Location } from '@/lib/items';
-import { gridColumns, type ItemsLayout } from '@/lib/items-layout';
+import type { ItemsLayout } from '@/lib/items-layout';
 import { isSameUri, parentUri, pathParts, placeOf, uriName } from '@/lib/local-places';
 import { isSelected, keepShown, type Selection, selectAll } from '@/lib/selection';
 import { sortBy, sortItems, visibleItems } from '@/lib/sorting';
 
 /** A picture larger than this is not decoded for an icon: its kind's glyph is drawn instead. */
 const THUMBNAIL_MAX_BYTES = 24 * 1024 * 1024;
+/** The preview pane's narrowest and widest, as the person drags its edge. */
+const PREVIEW_MIN_WIDTH = 220;
+const PREVIEW_MAX_WIDTH = 420;
 /** A window this wide draws its menu bar where the platform has none of its own. */
 const MENU_BAR_FROM = 640;
 
@@ -78,6 +84,17 @@ function thumbnailSource(item: Item): { uri: string } | AssetUrlRequest | null {
   }
 }
 
+/**
+ * The menus in the window, where the platform has no menu bar of its own and
+ * the window is wide enough: alone it follows the window's width, so a resize
+ * does not draw the place's whole pane again.
+ */
+function InWindowMenus({ children }: { children: ReactNode }) {
+  const window = useWindowDimensions();
+  if (window.width < MENU_BAR_FROM) return null;
+  return <View className="flex-row px-2 pb-1">{children}</View>;
+}
+
 export function Browser({ listing }: { listing: Listing }) {
   const { location, items } = listing;
   const browser = useBrowser();
@@ -86,7 +103,6 @@ export function Browser({ listing }: { listing: Listing }) {
   const albums = useAlbums();
   const platformWindow = useWindow();
   const platformMenuBar = usePlatformMenuBar();
-  const window = useWindowDimensions();
   const isWindowActive = platformWindow ? platformWindow.active : true;
 
   const [rawSelection, setSelection] = useState<Selection>(() =>
@@ -98,7 +114,8 @@ export function Browser({ listing }: { listing: Listing }) {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [albumBeingRenamed, setAlbumBeingRenamed] = useState<Album | null>(null);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
-  const [width, setWidth] = useState(0);
+  // The grid's columns, for the arrows: read as a key is pressed, never drawn.
+  const columns = useRef(1);
   // The name being typed in place, kept here so a press elsewhere keeps it as
   // Return does (Finder's rename ends either way), and only once.
   const renaming = useRef<{ key: string; text: string } | null>(null);
@@ -110,6 +127,7 @@ export function Browser({ listing }: { listing: Listing }) {
   // Items gone, renamed or searched away leave the selection.
   const selection = keepShown(rawSelection, shownKeys);
   const selected = shown.filter((item) => isSelected(selection, item.key));
+  const previewed = selected.length === 1 ? (selected[0] ?? null) : null;
   const handleSelectionChange = (change: (current: Selection) => Selection) =>
     setSelection((current) => change(keepShown(current, shownKeys)));
 
@@ -199,7 +217,7 @@ export function Browser({ listing }: { listing: Listing }) {
   useBrowserKeys({
     isEnabled: isWindowActive && confirm === null,
     viewMode,
-    columns: gridColumns(width, listing.layout),
+    getColumns: () => columns.current,
     shown,
     onSelectionChange: handleSelectionChange,
     commands,
@@ -274,60 +292,126 @@ export function Browser({ listing }: { listing: Listing }) {
         />
       </View>
     ) : (
-      <ItemsView
-        items={shown}
-        mode={viewMode}
-        layout={listing.layout}
-        label={listing.title}
-        selection={selection}
-        onSelectionChange={handleSelectionChange}
-        isWindowActive={isWindowActive}
-        thumbnails={thumbnails}
-        renamingKey={renamingKey}
-        onRenameText={(text) => {
-          if (renaming.current) renaming.current.text = text;
+      // The items and, while exactly one is selected, its preview beside them,
+      // as Finder's preview pane: Bloom's panels, under the toolbar.
+      <AppShellPanels
+        scope="local"
+        testID="browser-panels"
+        layout={{
+          mode: 'split',
+          flow: 'bounded',
+          appearance: 'separated',
+          widths: { preview: browser.previewWidth },
+          onWidthsChange: (widths) =>
+            browser.setPreviewWidth(widths.preview ?? browser.previewWidth),
+          panels: [
+            {
+              id: 'items',
+              chrome: 'none',
+              appearance: 'plain',
+              content: (
+                <ItemsView
+                  items={shown}
+                  mode={viewMode}
+                  layout={listing.layout}
+                  label={listing.title}
+                  selection={selection}
+                  onSelectionChange={handleSelectionChange}
+                  isWindowActive={isWindowActive}
+                  thumbnails={thumbnails}
+                  renamingKey={renamingKey}
+                  onRenameText={(text) => {
+                    if (renaming.current) renaming.current.text = text;
+                  }}
+                  onRenameDone={commitRename}
+                  order={order}
+                  onSort={(column) => browser.setOrder(location, sortBy(order, column))}
+                  dateColumn={
+                    location.kind === 'trash'
+                      ? 'deleted'
+                      : listing.layout === 'photos'
+                        ? 'taken'
+                        : 'date'
+                  }
+                  hasOriginColumn={location.kind === 'trash'}
+                  originOf={originOf}
+                  onOpen={commands.openItem}
+                  canDrop={commands.canDrop}
+                  onDrop={commands.drop}
+                  onAction={(item, action) => {
+                    if (action === 'activate') commands.openItem(item);
+                    else if (action === 'select') {
+                      handleSelectionChange((current) =>
+                        isSelected(current, item.key)
+                          ? { ...current, keys: current.keys.filter((key) => key !== item.key) }
+                          : {
+                              keys: [...current.keys, item.key],
+                              anchor: item.key,
+                              focus: item.key,
+                            },
+                      );
+                    } else if (action === 'rename' && item.source === 'local') {
+                      setSelection({ keys: [item.key], anchor: item.key, focus: item.key });
+                      startRename(item);
+                    } else if (action === 'trash') {
+                      setSelection({ keys: [item.key], anchor: item.key, focus: item.key });
+                      if (location.kind === 'trash') commands.putBack.run();
+                      else commands.moveToTrash.run();
+                    }
+                  }}
+                  itemActions={itemActions}
+                  itemMenu={(item) => <ItemMenuRows item={item} commands={commands} />}
+                  backgroundMenu={
+                    <BackgroundMenuRows
+                      commands={commands}
+                      location={location}
+                      viewMode={viewMode}
+                      onViewMode={(mode) => browser.setViewMode(location, mode)}
+                    />
+                  }
+                  emptyState={emptyState}
+                  onColumnsChange={(next) => {
+                    columns.current = next;
+                  }}
+                  onEndReached={listing.onEndReached}
+                />
+              ),
+            },
+            // View > Show Preview, Finder's: the item selected, or what the place holds.
+            ...(browser.isPreviewShown
+              ? [
+                  {
+                    id: 'preview',
+                    width: browser.previewWidth,
+                    minWidth: PREVIEW_MIN_WIDTH,
+                    maxWidth: PREVIEW_MAX_WIDTH,
+                    resizable: true,
+                    resizeLabel: strings.resizePreview,
+                    chrome: 'none',
+                    appearance: 'plain',
+                    scroll: 'panel',
+                    content: previewed ? (
+                      <PreviewPane
+                        key={previewed.key}
+                        item={previewed}
+                        thumbnailUrl={thumbnails.get(previewed.key) ?? null}
+                        origin={originOf(previewed) || null}
+                      />
+                    ) : (
+                      <View
+                        className="flex-1 items-center justify-center p-4"
+                        testID="preview-none"
+                      >
+                        <Text variant="body-2-regular" className="text-center text-text-secondary">
+                          {selected.length > 1 ? statusText : strings.noSelection}
+                        </Text>
+                      </View>
+                    ),
+                  } satisfies AppShellPanelDefinition,
+                ]
+              : []),
+          ],
         }}
-        onRenameDone={commitRename}
-        order={order}
-        onSort={(column) => browser.setOrder(location, sortBy(order, column))}
-        dateColumn={
-          location.kind === 'trash' ? 'deleted' : listing.layout === 'photos' ? 'taken' : 'date'
-        }
-        hasOriginColumn={location.kind === 'trash'}
-        originOf={originOf}
-        onOpen={commands.openItem}
-        canDrop={commands.canDrop}
-        onDrop={commands.drop}
-        onAction={(item, action) => {
-          if (action === 'activate') commands.openItem(item);
-          else if (action === 'select') {
-            handleSelectionChange((current) =>
-              isSelected(current, item.key)
-                ? { ...current, keys: current.keys.filter((key) => key !== item.key) }
-                : { keys: [...current.keys, item.key], anchor: item.key, focus: item.key },
-            );
-          } else if (action === 'rename' && item.source === 'local') {
-            setSelection({ keys: [item.key], anchor: item.key, focus: item.key });
-            startRename(item);
-          } else if (action === 'trash') {
-            setSelection({ keys: [item.key], anchor: item.key, focus: item.key });
-            if (location.kind === 'trash') commands.putBack.run();
-            else commands.moveToTrash.run();
-          }
-        }}
-        itemActions={itemActions}
-        itemMenu={(item) => <ItemMenuRows item={item} commands={commands} />}
-        backgroundMenu={
-          <BackgroundMenuRows
-            commands={commands}
-            location={location}
-            viewMode={viewMode}
-            onViewMode={(mode) => browser.setViewMode(location, mode)}
-          />
-        }
-        emptyState={emptyState}
-        onWidthChange={setWidth}
-        onEndReached={listing.onEndReached}
       />
     );
 
@@ -360,6 +444,8 @@ export function Browser({ listing }: { listing: Listing }) {
       }
       isShowingHidden={browser.isShowingHidden}
       onShowingHidden={browser.setShowingHidden}
+      isPreviewShown={browser.isPreviewShown}
+      onPreviewShown={browser.setPreviewShown}
       canGoBack={browser.canGoBack}
       canGoForward={browser.canGoForward}
       onBack={browser.goBack}
@@ -384,6 +470,8 @@ export function Browser({ listing }: { listing: Listing }) {
           canGoForward={browser.canGoForward}
           onBack={browser.goBack}
           onForward={browser.goForward}
+          isPreviewShown={browser.isPreviewShown}
+          onPreviewShown={browser.setPreviewShown}
           onUpload={
             location.kind === 'cloud' && commands.uploadPicked.isEnabled
               ? commands.uploadPicked.run
@@ -401,11 +489,7 @@ export function Browser({ listing }: { listing: Listing }) {
         ) : undefined
       }
     >
-      {platformMenuBar ? (
-        menus
-      ) : window.width >= MENU_BAR_FROM ? (
-        <View className="flex-row px-2 pb-1">{menus}</View>
-      ) : null}
+      {platformMenuBar ? menus : <InWindowMenus>{menus}</InWindowMenus>}
       {body}
       <AlertDialog
         open={confirm !== null}

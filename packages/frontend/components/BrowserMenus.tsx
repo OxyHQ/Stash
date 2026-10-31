@@ -46,6 +46,8 @@ export function BrowserMenus({
   onSortColumn,
   isShowingHidden,
   onShowingHidden,
+  isPreviewShown,
+  onPreviewShown,
   canGoBack,
   canGoForward,
   onBack,
@@ -62,6 +64,8 @@ export function BrowserMenus({
   onSortColumn: (column: SortColumn) => void;
   isShowingHidden: boolean;
   onShowingHidden: (isShowing: boolean) => void;
+  isPreviewShown: boolean;
+  onPreviewShown: (isShown: boolean) => void;
   canGoBack: boolean;
   canGoForward: boolean;
   onBack: () => void;
@@ -256,6 +260,9 @@ export function BrowserMenus({
             </MenubarRadioItem>
           </MenubarRadioGroup>
           <MenubarSeparator />
+          <MenubarItem shortcut="Mod+Shift+P" onPress={() => onPreviewShown(!isPreviewShown)}>
+            {isPreviewShown ? strings.menus.hidePreview : strings.menus.showPreview}
+          </MenubarItem>
           {navigationDock.available ? (
             <>
               <MenubarItem shortcut="Mod+Alt+S" onPress={navigationDock.toggleHidden}>
