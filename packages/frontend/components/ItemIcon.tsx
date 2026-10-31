@@ -8,6 +8,7 @@ import {
   RiDiscLine,
   RiFileExcel2Line,
   RiFileImageLine,
+  RiFileLine,
   RiFileMusicLine,
   RiFilePdf2Line,
   RiFileTextLine,
@@ -19,7 +20,7 @@ import {
   RiText,
 } from '@oxy.so/bloom/icons';
 import { useTheme } from '@oxy.so/bloom/theme';
-import type { ComponentType } from 'react';
+import { type ComponentType, useState } from 'react';
 import { Image, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { Kind } from '@/lib/kinds';
@@ -46,7 +47,7 @@ const GLYPHS: Partial<Record<Kind, Glyph>> = {
 /** The page is drawn in a square this many units across. */
 const PAGE_VIEWBOX = 64;
 
-/** A list's icon is too small for a glyph to be read on its page: it is the page alone. */
+/** Below this a page with a glyph cannot be read: a list's icon is the kind's small glyph. */
 const GLYPH_FROM_SIZE = 32;
 
 /** A page with its top corner turned, its kind's glyph in the middle where there is room for one. */
@@ -56,8 +57,14 @@ function PageArt({ size, kind }: { size: number; kind: Kind }) {
   const glyph = Math.round(size * 0.36);
   const paper = theme.isDark ? '#2c2c30' : '#ffffff';
   const edge = theme.isDark ? '#5a5a62' : '#c9c9cf';
-  // The page's edge stays a pixel wide however small the icon is drawn (a list's).
+  // The page's edge stays a pixel wide however small the icon is drawn.
   const stroke = Math.max(1.2, PAGE_VIEWBOX / size);
+  // A list's icon is too small for a glyph on a page: it is its kind's own
+  // small glyph: a page with the kind drawn on it.
+  if (size < GLYPH_FROM_SIZE) {
+    const Small = GLYPHS[kind] ?? RiFileLine;
+    return <Small width={size} height={size} fill={theme.colors.textSecondary} />;
+  }
   const page = (
     <Svg width={size} height={size} viewBox={`0 0 ${PAGE_VIEWBOX} ${PAGE_VIEWBOX}`}>
       <Path
@@ -69,7 +76,6 @@ function PageArt({ size, kind }: { size: number; kind: Kind }) {
       <Path d="M40 4v12a2 2 0 0 0 2 2h12" fill="none" stroke={edge} strokeWidth={stroke} />
     </Svg>
   );
-  if (size < GLYPH_FROM_SIZE) return page;
   return (
     <View style={{ width: size, height: size }}>
       {page}
@@ -111,9 +117,11 @@ export interface ItemIconProps {
   thumbnailUrl: string | null;
   /** Fill the square with the picture (Photos' grid) rather than fit it (Finder's icons). */
   isCropped?: boolean;
+  /** Names the picture, whose loading React hears (it falls back to the page when it fails). */
+  testID?: string;
 }
 
-export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false }: ItemIconProps) {
+export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false, testID }: ItemIconProps) {
   if (kind === 'folder') {
     return (
       <Image
@@ -126,14 +134,45 @@ export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false }: ItemIc
   }
   if (kind === 'album') return <AlbumArt size={size} coverUrl={thumbnailUrl} />;
   if (thumbnailUrl && (kind === 'image' || kind === 'video')) {
+    // A picture the platform cannot draw (damaged, or a kind it cannot read)
+    // is its kind's page again; a new picture is tried afresh.
     return (
-      <Image
-        source={{ uri: thumbnailUrl }}
-        style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
-        resizeMode={isCropped ? 'cover' : 'contain'}
-        accessible={false}
+      <Thumbnail
+        key={thumbnailUrl}
+        uri={thumbnailUrl}
+        kind={kind}
+        size={size}
+        isCropped={isCropped}
+        testID={testID}
       />
     );
   }
   return <PageArt size={size} kind={kind} />;
+}
+
+function Thumbnail({
+  uri,
+  kind,
+  size,
+  isCropped,
+  testID,
+}: {
+  uri: string;
+  kind: Kind;
+  size: number;
+  isCropped: boolean;
+  testID: string | undefined;
+}) {
+  const [hasFailed, setHasFailed] = useState(false);
+  if (hasFailed) return <PageArt size={size} kind={kind} />;
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
+      resizeMode={isCropped ? 'cover' : 'contain'}
+      accessible={false}
+      onError={() => setHasFailed(true)}
+      testID={testID}
+    />
+  );
 }

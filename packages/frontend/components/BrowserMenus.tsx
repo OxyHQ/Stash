@@ -4,6 +4,7 @@
  * bar) Bloom's `Menubar` describes them to it; elsewhere it draws them in the
  * window.
  */
+import { useAppShell } from '@oxy.so/bloom/app-shell';
 import {
   Menubar,
   MenubarCheckboxItem,
@@ -69,6 +70,7 @@ export function BrowserMenus({
   onGo: (location: Location) => void;
 }) {
   const { strings } = useLocale();
+  const { navigationDock } = useAppShell();
   const isInTrash = location.kind === 'trash';
   const home = places.find((place) => place.kind === 'home');
   return (
@@ -254,6 +256,14 @@ export function BrowserMenus({
             </MenubarRadioItem>
           </MenubarRadioGroup>
           <MenubarSeparator />
+          {navigationDock.available ? (
+            <>
+              <MenubarItem shortcut="Mod+Alt+S" onPress={navigationDock.toggleHidden}>
+                {navigationDock.hidden ? strings.menus.showSidebar : strings.menus.hideSidebar}
+              </MenubarItem>
+              <MenubarSeparator />
+            </>
+          ) : null}
           <MenubarSub>
             <MenubarSubTrigger>{strings.menus.sortBy}</MenubarSubTrigger>
             <MenubarSubContent>

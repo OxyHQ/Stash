@@ -19,7 +19,10 @@ const GRID_PADDING = 12;
 /** Photos' grid: square pictures at least this wide, this far apart. */
 const PHOTO_MIN_SIZE = 110;
 const PHOTO_GAP = 2;
-/** The list's rows: a desktop's compact rows, a phone's touch-sized ones below this width. */
+/**
+ * The list's rows: a desktop's compact rows, a phone's touch-sized ones below
+ * this width. A desktop window is driven by a pointer at any width.
+ */
 const COMPACT_ROW_HEIGHT = 28;
 const TOUCH_ROW_HEIGHT = 44;
 const TOUCH_LIST_BELOW = 600;
@@ -50,9 +53,11 @@ export function itemsGeometry(
   mode: 'icons' | 'list',
   layout: ItemsLayout,
   width: number,
+  isDesktopWindow = false,
 ): ItemsGeometry {
   if (mode === 'list') {
-    const rowHeight = width < TOUCH_LIST_BELOW ? TOUCH_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
+    const rowHeight =
+      !isDesktopWindow && width < TOUCH_LIST_BELOW ? TOUCH_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
     return {
       arrangement: 'list',
       columns: 1,

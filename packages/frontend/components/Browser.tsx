@@ -10,6 +10,7 @@ import { EmptyState } from '@oxy.so/bloom/empty-state';
 import type { BloomIconComponent } from '@oxy.so/bloom/icons';
 import { Loading } from '@oxy.so/bloom/loading';
 import { usePlatformMenuBar } from '@oxy.so/bloom/platform-surface';
+import { Screen } from '@oxy.so/bloom/screen';
 import { useWindow } from '@oxy.so/bloom/window';
 import type { Album } from '@stash/shared-types';
 import { useRef, useState } from 'react';
@@ -369,33 +370,43 @@ export function Browser({ listing }: { listing: Listing }) {
   );
 
   return (
-    <View className="flex-1" testID="browser">
+    <Screen
+      testID="browser"
+      scroll="none"
+      header={
+        <Toolbar
+          title={listing.title}
+          viewMode={viewMode}
+          onViewMode={(mode) => browser.setViewMode(location, mode)}
+          search={search}
+          onSearch={setSearch}
+          canGoBack={browser.canGoBack}
+          canGoForward={browser.canGoForward}
+          onBack={browser.goBack}
+          onForward={browser.goForward}
+          onUpload={
+            location.kind === 'cloud' && commands.uploadPicked.isEnabled
+              ? commands.uploadPicked.run
+              : null
+          }
+        />
+      }
+      bottomBar={
+        listing.status === 'ready' ? (
+          <StatusBar
+            text={statusText}
+            path={isAtPlace ? [] : path}
+            onPath={(uri) => browser.navigate({ kind: 'folder', uri })}
+          />
+        ) : undefined
+      }
+    >
       {platformMenuBar ? (
         menus
       ) : window.width >= MENU_BAR_FROM ? (
-        <View className="flex-row px-2 pt-2">{menus}</View>
+        <View className="flex-row px-2 pb-1">{menus}</View>
       ) : null}
-      <Toolbar
-        title={listing.title}
-        path={isAtPlace ? [] : path}
-        onPath={(uri) => browser.navigate({ kind: 'folder', uri })}
-        viewMode={viewMode}
-        onViewMode={(mode) => browser.setViewMode(location, mode)}
-        search={search}
-        onSearch={setSearch}
-        canGoBack={browser.canGoBack}
-        canGoForward={browser.canGoForward}
-        onBack={browser.goBack}
-        onForward={browser.goForward}
-        onUpload={
-          location.kind === 'cloud' && commands.uploadPicked.isEnabled
-            ? commands.uploadPicked.run
-            : null
-        }
-        width={width}
-      />
       {body}
-      {listing.status === 'ready' ? <StatusBar text={statusText} /> : null}
       <AlertDialog
         open={confirm !== null}
         onOpenChange={(isOpen) => {
@@ -450,6 +461,6 @@ export function Browser({ listing }: { listing: Listing }) {
           onClose={() => setAlbumBeingRenamed(null)}
         />
       ) : null}
-    </View>
+    </Screen>
   );
 }

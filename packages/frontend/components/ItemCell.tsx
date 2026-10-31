@@ -70,7 +70,13 @@ export const ItemCell = memo(function ItemCell({
   if (layout === 'photos') {
     return (
       <View {...accessibility} className="absolute bg-muted" style={{ left, top, width, height }}>
-        <ItemIcon kind={kind} size={width} thumbnailUrl={thumbnailUrl} isCropped />
+        <ItemIcon
+          kind={kind}
+          size={width}
+          thumbnailUrl={thumbnailUrl}
+          isCropped
+          testID={`thumbnail-${item.name}`}
+        />
         {isSelected || isDropTarget ? (
           <View
             pointerEvents="none"
@@ -96,13 +102,18 @@ export const ItemCell = memo(function ItemCell({
       <View
         className={
           isSelected
-            ? 'rounded-lg bg-fill-secondary p-1'
+            ? 'rounded-[8px] bg-fill-secondary p-1'
             : isDropTarget
-              ? 'rounded-lg bg-primary-subtle p-1'
-              : 'rounded-lg p-1'
+              ? 'rounded-[8px] bg-primary-subtle p-1'
+              : 'rounded-[8px] p-1'
         }
       >
-        <ItemIcon kind={kind} size={ICON_CELL.icon} thumbnailUrl={thumbnailUrl} />
+        <ItemIcon
+          kind={kind}
+          size={ICON_CELL.icon}
+          thumbnailUrl={thumbnailUrl}
+          testID={`thumbnail-${item.name}`}
+        />
       </View>
       {rename && item.source === 'local' ? (
         <RenameField
