@@ -6,11 +6,11 @@ import { Dialog } from '@oxy.so/bloom/dialog';
 import { Text } from '@oxy.so/bloom/typography';
 import { useQuery } from '@tanstack/react-query';
 import { Image, ScrollView, View } from 'react-native';
+import { ItemFacts } from '@/components/ItemFacts';
 import { ItemIcon } from '@/components/ItemIcon';
 import { useLocale } from '@/hooks/use-locale';
 import { useViewer } from '@/hooks/use-viewer';
-import { formatDate, formatSize } from '@/lib/format';
-import { assetIdOf, type Item, itemDate, itemKind } from '@/lib/items';
+import { assetIdOf, type Item, itemKind } from '@/lib/items';
 import { readText } from '@/lib/local-files';
 import { oxyServices } from '@/lib/oxy';
 
@@ -69,19 +69,6 @@ function PictureOrText({ item }: { item: Item }) {
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <View className="flex-row gap-2">
-      <Text variant="caption-1-regular" className="w-28 text-end text-text-secondary">
-        {label}
-      </Text>
-      <Text variant="caption-1-regular" className="flex-1 text-foreground">
-        {value}
-      </Text>
-    </View>
-  );
-}
-
 export function PreviewDialog({
   item,
   origin,
@@ -91,10 +78,8 @@ export function PreviewDialog({
   origin: string | null;
   onClose: () => void;
 }) {
-  const { strings, locale } = useLocale();
+  const { strings } = useLocale();
   const kind = item ? itemKind(item) : 'file';
-  const date = item ? itemDate(item) : null;
-  const isTrashed = item?.source === 'local-trash' || item?.source === 'cloud-trash';
   return (
     <Dialog open={item !== null} onClose={onClose} title={item?.name} testID="preview">
       {item ? (
@@ -104,25 +89,7 @@ export function PreviewDialog({
           ) : (
             <ItemIcon kind={kind} size={128} thumbnailUrl={null} />
           )}
-          <View className="w-full gap-1">
-            <Fact label={strings.preview.kind} value={strings.kinds[kind]} />
-            {item.size === null ? null : (
-              <Fact
-                label={strings.preview.size}
-                value={formatSize(item.size, strings.units, locale)}
-              />
-            )}
-            {item.source === 'album-photo' ? (
-              <Fact label={strings.preview.dimensions} value={`${item.width} × ${item.height}`} />
-            ) : null}
-            {date === null ? null : (
-              <Fact
-                label={isTrashed ? strings.preview.deleted : strings.preview.modified}
-                value={formatDate(date, Date.now(), locale, strings)}
-              />
-            )}
-            {origin ? <Fact label={strings.preview.where} value={origin} /> : null}
-          </View>
+          <ItemFacts item={item} origin={origin} />
           {kind !== 'image' && kind !== 'text' && kind !== 'code' ? (
             <Text variant="caption-1-regular" className="text-text-secondary">
               {strings.preview.noPreview}

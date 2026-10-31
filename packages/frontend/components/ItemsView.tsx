@@ -51,6 +51,7 @@ import { ListHeader, type ListColumns } from '@/components/ListHeader';
 import type { Item } from '@/lib/items';
 import {
   contentHeight,
+  gridColumns,
   type ItemsLayout,
   itemAt,
   itemFrame,
@@ -142,7 +143,12 @@ export interface ItemsViewProps {
   itemMenu: (item: Item) => ReactNode;
   backgroundMenu: ReactNode;
   emptyState: ReactNode;
-  onWidthChange: (width: number) => void;
+  /**
+   * The grid's columns at the width it was laid out at, for the arrows' steps
+   * down it. Told without drawing anything again: a window resized live lays
+   * the items out once per size, not their place's whole pane too.
+   */
+  onColumnsChange: (columns: number) => void;
   onEndReached?: () => void;
 }
 
@@ -171,7 +177,7 @@ export function ItemsView({
   itemMenu,
   backgroundMenu,
   emptyState,
-  onWidthChange,
+  onColumnsChange,
   onEndReached,
 }: ItemsViewProps) {
   const theme = useTheme();
@@ -426,7 +432,7 @@ export function ItemsView({
   const handleLayout = (event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
     setWidth(next);
-    onWidthChange(next);
+    onColumnsChange(gridColumns(next, layout));
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

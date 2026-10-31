@@ -1,42 +1,45 @@
 /**
- * The window, Finder's, as Bloom's desktop window: the sidebar flush to the
- * window's leading edge with the window's controls at its top, and one pane
- * (the route's place) beside it, whose toolbar is the window's title area.
- * Where the platform has windows the sidebar stays in the window at every
- * size the window can take: it hides into the window's edge and peeks back
- * from it, never becoming a drawer, and the window is never made smaller than
- * the sidebar and the narrowest pane beside it. On a phone the sidebar is the
- * shell's drawer.
+ * The window, composed as Oxy's other apps compose theirs (Mention, Inbox) on
+ * Bloom's AppShell: the sidebar (Stash's mark, Finder's sections, the Oxy
+ * account at its foot) and the route's place in one panel, whose own panels
+ * hold the items and their preview. Bloom decides the rest: where the
+ * platform has windows the sidebar stays in the window at every size (hiding
+ * into its edge by its dock, peeking back), the panel's toolbar is the
+ * window's title area, and the window is never made smaller than Stash's
+ * layout holds together at; on a phone the sidebar is the shell's drawer.
  */
 import { AppShell } from '@oxy.so/bloom/app-shell';
-import { useWindow, useWindowSizeLimits } from '@oxy.so/bloom/window';
-import { Slot } from 'expo-router';
+import { useWindowSizeLimits } from '@oxy.so/bloom/window';
+import { ProfileButton } from '@oxy.so/services/ui/client';
+import { Slot, usePathname } from 'expo-router';
+import { Image } from 'react-native';
 import { AlbumNameDialog } from '@/components/AlbumNameDialog';
 import { useBrowser } from '@/components/BrowserProvider';
 import { useAlbumActions } from '@/hooks/use-album-actions';
 import { useLocale } from '@/hooks/use-locale';
 import { useLocalPlaces } from '@/hooks/use-local-places';
 import { useSidebarTree } from '@/hooks/use-sidebar-tree';
+import { useViewer } from '@/hooks/use-viewer';
 import { locationKey } from '@/lib/items';
 
+const STASH_MARK = require('@/assets/images/icon.png');
 const SIDEBAR_WIDTH = 220;
 /**
- * The smallest window: the sidebar beside a pane whose toolbar still holds
- * its islands (the sidebar's toggle, back and forward, the view and a search
- * field) and two columns of icons, over a pane tall enough for a row of them
- * between the toolbar and the bars under it.
+ * The smallest window: the sidebar beside a toolbar that still holds its
+ * islands (the sidebar's toggle, back and forward, the view and the search's
+ * button) over two columns of icons, tall enough for a row of them between
+ * the toolbar and the bars under it.
  */
 const WINDOW_MIN = { minWidth: 640, minHeight: 400 };
-/** The pane's inset from the window's edges; it starts at the window's top. */
-const FRAME_INSET = { top: 0, end: 7, bottom: 7, start: 7 };
 
 export function BrowserShell() {
   const { location, navigate, isNewAlbumOpen, setNewAlbumOpen } = useBrowser();
   const { strings } = useLocale();
   const { places } = useLocalPlaces();
   const { tree, locations } = useSidebarTree(places, () => setNewAlbumOpen(true));
+  const { isSignedIn } = useViewer();
   const albumActions = useAlbumActions();
-  const isWindowed = useWindow() !== null;
+  const pathname = usePathname();
   useWindowSizeLimits(WINDOW_MIN);
   return (
     <>
@@ -45,20 +48,27 @@ export function BrowserShell() {
         header={null}
         navigationAlign="content"
         navigationGap={0}
+        gutter={8}
         contentMaxWidth="none"
-        // A desktop window keeps its navigation in the window at any width
-        // (Bloom's desktop window): it hides by its dock, never into a drawer.
-        navFrom={isWindowed ? 0 : undefined}
-        framedFrom={isWindowed ? 0 : undefined}
-        frameInset={isWindowed ? FRAME_INSET : undefined}
+        drawer="reveal"
         sidebar={{
           surface: 'plain',
           variant: 'panel',
+          // Finder's sections are the sidebar's rows: it hides whole (its dock),
+          // never shrinks to icons that cannot hold them.
           collapsed: false,
           collapseDisabled: true,
           width: SIDEBAR_WIDTH,
-          // Finder's sidebar starts with its sections, under the window's controls.
-          header: isWindowed ? false : undefined,
+          logo: {
+            icon: (
+              <Image source={STASH_MARK} className="h-7 w-7 rounded-[7px]" accessible={false} />
+            ),
+            wordmark: strings.appName,
+            onPress: () => {
+              const home = places.find((place) => place.kind === 'home');
+              if (home) navigate({ kind: 'folder', uri: home.uri });
+            },
+          },
           showSearch: false,
           showThemeToggle: false,
           tree,
@@ -67,12 +77,27 @@ export function BrowserShell() {
             const target = locations.get(item.key);
             if (target) navigate(target);
           },
-          dock: isWindowed ? { peek: true } : undefined,
+          footer: isSignedIn
+            ? ({ collapsed }) => <ProfileButton expanded={!collapsed} placement="up" />
+            : undefined,
+          dock: { peek: true },
         }}
         panelLayout={{
           mode: 'split',
           flow: 'bounded',
-          panels: [{ id: 'browser', content: <Slot /> }],
+          appearance: 'separated',
+          panels: [
+            {
+              id: 'browser',
+              chrome: 'none',
+              scroll: 'content',
+              // The router's place keeps one host across every layout change.
+              keepMounted: true,
+              // A place that throws fails inside its panel; going elsewhere recovers it.
+              errorBoundary: { resetKey: pathname },
+              content: <Slot />,
+            },
+          ],
         }}
       />
       {isNewAlbumOpen ? (

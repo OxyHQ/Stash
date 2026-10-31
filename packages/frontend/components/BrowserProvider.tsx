@@ -2,7 +2,7 @@
  * The window's own state, kept across the places it shows: where it is (the
  * route) and was (back and forward), how it shows items (icons or a list,
  * per kind of place), their order, whether hidden files show, and the album
- * name dialog the sidebar and the menus open.
+ * name dialog the sidebar and the menus open, and its preview pane.
  */
 import { router, useGlobalSearchParams, usePathname } from 'expo-router';
 import { createContext, type ReactNode, use, useState } from 'react';
@@ -48,7 +48,16 @@ interface BrowserValue {
   setShowingHidden: (isShowing: boolean) => void;
   isNewAlbumOpen: boolean;
   setNewAlbumOpen: (isOpen: boolean) => void;
+  /** Whether the window shows its preview pane (View > Show Preview), in every place. */
+  isPreviewShown: boolean;
+  setPreviewShown: (isShown: boolean) => void;
+  /** The preview pane's width, as the person last dragged it, in every place. */
+  previewWidth: number;
+  setPreviewWidth: (width: number) => void;
 }
+
+/** The preview pane's width until the person drags it, Finder's. */
+const PREVIEW_WIDTH = 280;
 
 const BrowserContext = createContext<BrowserValue | null>(null);
 
@@ -69,6 +78,8 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
   const [cameFrom, setCameFrom] = useState<Location | null>(null);
   const [isShowingHidden, setShowingHidden] = useState(false);
   const [isNewAlbumOpen, setNewAlbumOpen] = useState(false);
+  const [isPreviewShown, setPreviewShown] = useState(false);
+  const [previewWidth, setPreviewWidth] = useState(PREVIEW_WIDTH);
 
   // The route is where the window is; the history follows it however it got
   // there (a press here, the browser's own back, a phone's back gesture).
@@ -112,6 +123,10 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     setShowingHidden,
     isNewAlbumOpen,
     setNewAlbumOpen,
+    isPreviewShown,
+    setPreviewShown,
+    previewWidth,
+    setPreviewWidth,
   };
   return <BrowserContext value={value}>{children}</BrowserContext>;
 }
