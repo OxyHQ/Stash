@@ -1,4 +1,4 @@
-# Lint, types and the backend's tests against a real Postgres.
+# Lint, types, the frontend's tests and the backend's tests against a real Postgres.
 #
 # The service tests need a database: a disposable postgres:17-alpine service
 # container (the image docker-compose.postgres.yml runs locally), migrated with
@@ -53,6 +53,9 @@ jobs:
       # install fetches npm's unrelated `biome` package, which lints nothing.
       - run: ./node_modules/.bin/biome ci .
       - run: bun run typecheck
+      - name: Run the frontend tests
+        working-directory: packages/frontend
+        run: bun run test
       - name: Apply the migrations
         working-directory: packages/backend
         run: bun run db:migrate --target-database=stash_test
