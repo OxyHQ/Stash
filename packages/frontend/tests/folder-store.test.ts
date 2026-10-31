@@ -6,6 +6,11 @@ import { Directory, File, pathsAt } from './node-file-system';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stash-folder-store-'));
 mock.module('expo-file-system', () => ({ Directory, File, Paths: pathsAt(root) }));
+// The store lists folders through lib/local-files, which asks `expo` whether the platform has
+// files; Expo's own module would load React Native, which Bun cannot parse.
+mock.module('expo', () => ({
+  requireOptionalNativeModule: (name: string) => (name === 'FileSystem' ? {} : null),
+}));
 
 const store = await import('@/lib/folder-store');
 const uri = (relative: string) => encodeURI(`file://${path.join(root, relative)}`);
