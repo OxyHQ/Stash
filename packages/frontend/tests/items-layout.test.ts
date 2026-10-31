@@ -16,6 +16,8 @@ describe('the list', () => {
   test('stacks compact rows on a desktop, touch-sized ones on a phone', () => {
     expect(itemFrame(list, 3)).toEqual({ x: 0, y: 84, width: 1000, height: 28 });
     expect(itemFrame(itemsGeometry('list', 'files', 390), 3).height).toBe(44);
+    // A desktop window is driven by a pointer however narrow it is.
+    expect(itemFrame(itemsGeometry('list', 'files', 390, true), 3).height).toBe(28);
     expect(contentHeight(list, 27)).toBe(27 * 28);
   });
 

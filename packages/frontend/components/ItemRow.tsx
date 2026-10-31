@@ -79,10 +79,16 @@ export const ItemRow = memo(function ItemRow({
       aria-selected={isSelected}
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction(item, event.nativeEvent.actionName)}
-      className={`absolute inset-x-1.5 select-none flex-row items-center rounded-md px-2 ${rowClass}`}
+      className={`absolute inset-x-2.5 select-none flex-row items-center rounded-[6px] px-2 ${rowClass}`}
       style={{ top, height }}
     >
-      <ItemIcon kind={kind} size={iconSize} thumbnailUrl={thumbnailUrl} isCropped />
+      <ItemIcon
+        kind={kind}
+        size={iconSize}
+        thumbnailUrl={thumbnailUrl}
+        isCropped
+        testID={`thumbnail-${item.name}`}
+      />
       {rename && item.source === 'local' ? (
         <RenameField
           name={item.name}

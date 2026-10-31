@@ -23,6 +23,7 @@ import {
 import { isCommandKey } from '@oxy.so/bloom/kbd';
 import { useTheme } from '@oxy.so/bloom/theme';
 import { Text } from '@oxy.so/bloom/typography';
+import { useWindow } from '@oxy.so/bloom/window';
 import {
   type ComponentRef,
   type ReactNode,
@@ -184,7 +185,8 @@ export function ItemsView({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
 
-  const geometry = itemsGeometry(mode, layout, width);
+  const isDesktopWindow = useWindow() !== null;
+  const geometry = itemsGeometry(mode, layout, width, isDesktopWindow);
   const listColumns = columnsFor(width);
   const screen = viewportHeight > 0 ? viewportHeight : window.height;
   const stepHeight = Math.max(1, Math.floor(screen / 2));

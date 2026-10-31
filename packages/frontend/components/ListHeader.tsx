@@ -64,7 +64,7 @@ export function ListHeader({
     );
   };
   return (
-    <View className="mx-1.5 h-7 flex-row items-center border-b border-border px-2">
+    <View className="mx-2.5 h-7 flex-row items-center border-b border-border px-2">
       {header('name', strings.columns.name, null)}
       {hasOriginColumn ? (
         <Text
