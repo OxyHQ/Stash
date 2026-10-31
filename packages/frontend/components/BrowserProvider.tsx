@@ -32,6 +32,8 @@ function familyOf(location: Location): ViewFamily {
 
 interface BrowserValue {
   location: Location | null;
+  /** Where the window was before it came here: what it selects as it arrives. */
+  cameFrom: Location | null;
   history: History | null;
   navigate: (location: Location) => void;
   goBack: () => void;
@@ -53,10 +55,8 @@ const BrowserContext = createContext<BrowserValue | null>(null);
 export function BrowserProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const params = useGlobalSearchParams();
-  const location = locationFromRoute(pathname, params);
-  const [history, setHistory] = useState<History | null>(() =>
-    location ? historyAt(location) : null,
-  );
+  const routed = locationFromRoute(pathname, params);
+  const [history, setHistory] = useState<History | null>(() => (routed ? historyAt(routed) : null));
   const [viewModes, setViewModes] = useState<Record<ViewFamily, ViewMode>>({
     files: 'icons',
     media: 'icons',
@@ -66,18 +66,24 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     files: NAME_ORDER,
     media: { column: 'date', direction: 'descending' },
   });
+  const [cameFrom, setCameFrom] = useState<Location | null>(null);
   const [isShowingHidden, setShowingHidden] = useState(false);
   const [isNewAlbumOpen, setNewAlbumOpen] = useState(false);
 
   // The route is where the window is; the history follows it however it got
   // there (a press here, the browser's own back, a phone's back gesture).
   const current = history ? currentLocation(history) : null;
-  if (location && (!current || !sameLocation(current, location))) {
-    setHistory(history ? arrive(history, location) : historyAt(location));
+  if (routed && (!current || !sameLocation(current, routed))) {
+    setHistory(history ? arrive(history, routed) : historyAt(routed));
+    setCameFrom(current);
   }
+  // Where the window is, as the history holds it: the same object for as long
+  // as the window stays there, so what shows it draws again only when it moves.
+  const location = routed ? current : null;
 
   const value: BrowserValue = {
     location,
+    cameFrom,
     history,
     navigate: (next) => {
       if (location && sameLocation(location, next)) return;
@@ -93,9 +99,15 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     canGoBack: history !== null && canGoBack(history),
     canGoForward: history !== null && canGoForward(history),
     viewModeFor: (place) => viewModes[familyOf(place)],
-    setViewMode: (place, mode) => setViewModes((modes) => ({ ...modes, [familyOf(place)]: mode })),
+    setViewMode: (place, mode) => {
+      const family = familyOf(place);
+      setViewModes((modes) => ({ ...modes, [family]: mode }));
+    },
     orderFor: (place) => orders[familyOf(place)],
-    setOrder: (place, next) => setOrders((current) => ({ ...current, [familyOf(place)]: next })),
+    setOrder: (place, next) => {
+      const family = familyOf(place);
+      setOrders((known) => ({ ...known, [family]: next }));
+    },
     isShowingHidden,
     setShowingHidden,
     isNewAlbumOpen,

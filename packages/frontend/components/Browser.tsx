@@ -18,7 +18,7 @@ import { AlbumNameDialog } from '@/components/AlbumNameDialog';
 import { BrowserMenus } from '@/components/BrowserMenus';
 import { useBrowser } from '@/components/BrowserProvider';
 import { BackgroundMenuRows, ItemMenuRows } from '@/components/ItemMenus';
-import { gridColumns, type ItemsLayout, ItemsView } from '@/components/ItemsView';
+import { ItemsView } from '@/components/ItemsView';
 import { PreviewDialog } from '@/components/PreviewDialog';
 import { SignInPanel } from '@/components/SignInPanel';
 import { StatusBar } from '@/components/StatusBar';
@@ -29,10 +29,12 @@ import { useBrowserKeys } from '@/hooks/use-browser-keys';
 import { type ConfirmRequest, useCommands } from '@/hooks/use-commands';
 import { useLocale } from '@/hooks/use-locale';
 import { useLocalPlaces } from '@/hooks/use-local-places';
+import { selectionOnArrival } from '@/lib/history';
 import { previewOnPlatform } from '@/lib/local-files';
 import { type Item, itemKind, type LocalItem, type Location } from '@/lib/items';
+import { gridColumns, type ItemsLayout } from '@/lib/items-layout';
 import { isSameUri, parentUri, pathParts, placeOf, uriName } from '@/lib/local-places';
-import { isSelected, keepShown, NO_SELECTION, type Selection, selectAll } from '@/lib/selection';
+import { isSelected, keepShown, type Selection, selectAll } from '@/lib/selection';
 import { sortBy, sortItems, visibleItems } from '@/lib/sorting';
 
 /** A picture larger than this is not decoded for an icon: its kind's glyph is drawn instead. */
@@ -86,7 +88,9 @@ export function Browser({ listing }: { listing: Listing }) {
   const window = useWindowDimensions();
   const isWindowActive = platformWindow ? platformWindow.active : true;
 
-  const [rawSelection, setSelection] = useState<Selection>(NO_SELECTION);
+  const [rawSelection, setSelection] = useState<Selection>(() =>
+    selectionOnArrival(items, browser.cameFrom),
+  );
   const [search, setSearch] = useState('');
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<Item | null>(null);
@@ -232,6 +236,26 @@ export function Browser({ listing }: { listing: Listing }) {
       />
     ) : null;
 
+  // What assistive technology can do to an item: one list for the items alike,
+  // so an item draws again only when its own list changes.
+  const openActions = [
+    { name: 'activate', label: strings.menus.open },
+    { name: 'select', label: strings.select },
+  ];
+  const trashAction =
+    location.kind === 'trash'
+      ? { name: 'trash', label: strings.menus.putBack }
+      : { name: 'trash', label: strings.menus.moveToTrash };
+  const localActions = [
+    ...openActions,
+    ...(location.kind === 'folder' ? [{ name: 'rename', label: strings.menus.rename }] : []),
+    ...(location.kind === 'trash' || commands.hasPlatformTrash ? [trashAction] : []),
+  ];
+  const cloudActions = [...openActions, trashAction];
+  const otherActions = location.kind === 'trash' ? cloudActions : openActions;
+  const itemActions = (item: Item) =>
+    item.source === 'local' ? localActions : item.source === 'cloud' ? cloudActions : otherActions;
+
   const body =
     listing.status === 'signed-out' ? (
       <View className="flex-1 justify-center">
@@ -290,18 +314,7 @@ export function Browser({ listing }: { listing: Listing }) {
             else commands.moveToTrash.run();
           }
         }}
-        itemActions={(item) => [
-          { name: 'activate', label: strings.menus.open },
-          { name: 'select', label: strings.select },
-          ...(item.source === 'local' && location.kind === 'folder'
-            ? [{ name: 'rename', label: strings.menus.rename }]
-            : []),
-          ...(location.kind === 'trash'
-            ? [{ name: 'trash', label: strings.menus.putBack }]
-            : item.source === 'cloud' || (item.source === 'local' && commands.hasPlatformTrash)
-              ? [{ name: 'trash', label: strings.menus.moveToTrash }]
-              : []),
-        ]}
+        itemActions={itemActions}
         itemMenu={(item) => <ItemMenuRows item={item} commands={commands} />}
         backgroundMenu={
           <BackgroundMenuRows

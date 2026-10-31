@@ -175,7 +175,9 @@ export function useFileActions() {
       }
       if (!userId) return;
       const trashed: { assetId: string; name: string }[] = [];
-      for (let offset = 0; ; offset += EMPTY_PAGE_SIZE) {
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
         const page = await oxyServices.assets.list({
           status: 'trash',
           limit: EMPTY_PAGE_SIZE,
@@ -187,7 +189,8 @@ export function useFileActions() {
             name: asset.originalName ?? asset.id,
           })),
         );
-        if (!page.hasMore) break;
+        hasMore = page.hasMore;
+        offset += EMPTY_PAGE_SIZE;
       }
       await eachCloud(trashed, (assetId) => oxyServices.assets.delete(assetId), 'delete a file');
     },

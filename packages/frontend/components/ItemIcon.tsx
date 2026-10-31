@@ -43,24 +43,36 @@ const GLYPHS: Partial<Record<Kind, Glyph>> = {
   font: RiText,
 };
 
-/** A page with its top corner turned, its kind's glyph in the middle. */
+/** The page is drawn in a square this many units across. */
+const PAGE_VIEWBOX = 64;
+
+/** A list's icon is too small for a glyph to be read on its page: it is the page alone. */
+const GLYPH_FROM_SIZE = 32;
+
+/** A page with its top corner turned, its kind's glyph in the middle where there is room for one. */
 function PageArt({ size, kind }: { size: number; kind: Kind }) {
   const theme = useTheme();
   const Glyph = GLYPHS[kind] ?? RiFileTextLine;
   const glyph = Math.round(size * 0.36);
   const paper = theme.isDark ? '#2c2c30' : '#ffffff';
   const edge = theme.isDark ? '#5a5a62' : '#c9c9cf';
+  // The page's edge stays a pixel wide however small the icon is drawn (a list's).
+  const stroke = Math.max(1.2, PAGE_VIEWBOX / size);
+  const page = (
+    <Svg width={size} height={size} viewBox={`0 0 ${PAGE_VIEWBOX} ${PAGE_VIEWBOX}`}>
+      <Path
+        d="M14 4h26l14 14v40a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+        fill={paper}
+        stroke={edge}
+        strokeWidth={stroke}
+      />
+      <Path d="M40 4v12a2 2 0 0 0 2 2h12" fill="none" stroke={edge} strokeWidth={stroke} />
+    </Svg>
+  );
+  if (size < GLYPH_FROM_SIZE) return page;
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 64 64">
-        <Path
-          d="M14 4h26l14 14v40a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
-          fill={paper}
-          stroke={edge}
-          strokeWidth={1.2}
-        />
-        <Path d="M40 4v12a2 2 0 0 0 2 2h12" fill="none" stroke={edge} strokeWidth={1.2} />
-      </Svg>
+      {page}
       <View className="absolute inset-x-0 items-center" style={{ top: size * 0.4 }}>
         <Glyph width={glyph} height={glyph} fill={theme.colors.textSecondary} />
       </View>
@@ -115,14 +127,12 @@ export function ItemIcon({ kind, size, thumbnailUrl, isCropped = false }: ItemIc
   if (kind === 'album') return <AlbumArt size={size} coverUrl={thumbnailUrl} />;
   if (thumbnailUrl && (kind === 'image' || kind === 'video')) {
     return (
-      <View className="items-center justify-center" style={{ width: size, height: size }}>
-        <Image
-          source={{ uri: thumbnailUrl }}
-          style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
-          resizeMode={isCropped ? 'cover' : 'contain'}
-          accessible={false}
-        />
-      </View>
+      <Image
+        source={{ uri: thumbnailUrl }}
+        style={{ width: size, height: size, borderRadius: isCropped ? 0 : 4 }}
+        resizeMode={isCropped ? 'cover' : 'contain'}
+        accessible={false}
+      />
     );
   }
   return <PageArt size={size} kind={kind} />;

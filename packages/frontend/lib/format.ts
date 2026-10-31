@@ -1,4 +1,33 @@
-/** How sizes and dates read, as Finder writes them, in the person's language. */
+/**
+ * How sizes and dates read, as Finder writes them, in the person's language.
+ * A list formats a date and a size on every row, so each formatter is made
+ * once per language and kept: making one costs far more than using it (on
+ * OxyOS it goes through the platform's ICU).
+ */
+
+const numberFormats = new Map<string, Intl.NumberFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+function numberFormat(locale: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${locale} ${JSON.stringify(options)}`;
+  const known = numberFormats.get(key);
+  if (known) return known;
+  const made = new Intl.NumberFormat(locale, options);
+  numberFormats.set(key, made);
+  return made;
+}
+
+function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale} ${JSON.stringify(options)}`;
+  const known = dateFormats.get(key);
+  if (known) return known;
+  const made = new Intl.DateTimeFormat(locale, options);
+  dateFormats.set(key, made);
+  return made;
+}
+
+const CLOCK: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+const DAY: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
 
 export interface SizeUnits {
   bytes: (count: number) => string;
@@ -19,7 +48,7 @@ export function formatSize(bytes: number, units: SizeUnits, locale: string): str
     step++;
   }
   const digits = value < 10 ? 1 : 0;
-  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+  const number = numberFormat(locale, { maximumFractionDigits: digits }).format(value);
   return `${number} ${steps[step]}`;
 }
 
@@ -41,31 +70,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** A date as Finder's list writes it: "Today at 10:04", "Yesterday at…", else the date and the time. */
 export function formatDate(time: number, now: number, locale: string, words: DayWords): string {
   const date = new Date(time);
-  const clock = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(
-    date,
-  );
+  const clock = dateFormat(locale, CLOCK).format(date);
   if (isSameDay(date, new Date(now))) return words.today(clock);
   if (isSameDay(date, new Date(now - DAY_MS))) return words.yesterday(clock);
-  const day = new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-  return `${day}, ${clock}`;
+  return `${dateFormat(locale, DAY).format(date)}, ${clock}`;
 }
 
 /** A day as Photos names a photo by it: "12 Mar 2026". */
 export function formatDay(time: number, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(time));
+  return dateFormat(locale, DAY).format(new Date(time));
 }
 
 /** A share of a whole, as a progress reads: "45 %" or "45%", as the locale writes it. */
 export function formatPercent(fraction: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(
+  return numberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(
     Math.min(1, Math.max(0, fraction)),
   );
 }

@@ -21,6 +21,7 @@ export default function AlbumScreen() {
   );
   return (
     <Browser
+      key={id}
       listing={{
         location: { kind: 'album', albumId: id },
         title: shownAlbum?.name ?? strings.albums,

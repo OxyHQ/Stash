@@ -139,7 +139,7 @@ export function boxBetween(from: { x: number; y: number }, to: { x: number; y: n
   };
 }
 
-function intersects(first: Box, second: Box): boolean {
+export function intersects(first: Box, second: Box): boolean {
   return (
     first.x < second.x + second.width &&
     second.x < first.x + first.width &&
@@ -148,42 +148,61 @@ function intersects(first: Box, second: Box): boolean {
   );
 }
 
-export function contains(box: Box, point: { x: number; y: number }): boolean {
-  return (
-    point.x >= box.x &&
-    point.x <= box.x + box.width &&
-    point.y >= box.y &&
-    point.y <= box.y + box.height
-  );
-}
-
 /**
- * A rubber band over the items laid out at `frames`: those it touches, which
- * flip what was selected when it began if a modifier was held, else alone.
+ * A rubber band over the items it `touched` (in the order shown): they flip
+ * what was selected when it began if a modifier was held, else they alone are.
  */
 export function bandSelect(
   before: Selection,
-  order: readonly string[],
-  frames: ReadonlyMap<string, Box>,
-  band: Box,
+  touched: readonly string[],
   isAdding: boolean,
 ): Selection {
-  const touched = order.filter((key) => {
-    const frame = frames.get(key);
-    return frame !== undefined && intersects(frame, band);
-  });
   const keys = isAdding
     ? [
         ...before.keys.filter((key) => !touched.includes(key)),
         ...touched.filter((key) => !before.keys.includes(key)),
       ]
-    : touched;
+    : touched.slice();
   if (keys.length === 0) return NO_SELECTION;
   return {
     keys,
     anchor: touched[0] ?? before.anchor,
     focus: touched.at(-1) ?? before.focus,
   };
+}
+
+/** Two presses this close together, on one item, are a double click. */
+export const DOUBLE_CLICK_MS = 500;
+
+/** The press a double click's second press follows: on which item, and when. */
+export interface LastPress {
+  key: string | null;
+  at: number;
+}
+
+export const NO_PRESS: LastPress = { key: null, at: 0 };
+
+/**
+ * When a press happened, by its own clock: the device's time the platform
+ * carries (`nativeEvent.timestamp`, as React Native has it on Android and
+ * iOS), or else the time the platform made the event (`timeStamp`, the DOM
+ * event's on the web). Never when JavaScript got round to it: under load
+ * that is late by however long the last frame took.
+ */
+export function pressTime(event: { timeStamp: number; nativeEvent: object }): number {
+  const { nativeEvent } = event;
+  const timestamp = 'timestamp' in nativeEvent ? nativeEvent.timestamp : undefined;
+  return typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0
+    ? timestamp
+    : event.timeStamp;
+}
+
+/**
+ * Whether a press on `key` at `at` (the press's own time, as the event carries
+ * it, not when it was handled) is the second of a double click.
+ */
+export function isSecondClick(last: LastPress, key: string, at: number): boolean {
+  return last.key === key && at >= last.at && at - last.at < DOUBLE_CLICK_MS;
 }
 
 /**
