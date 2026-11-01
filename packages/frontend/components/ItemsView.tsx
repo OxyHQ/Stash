@@ -98,6 +98,7 @@ import type { SortColumn, SortOrder } from '@/lib/sorting';
 /** What the items take dropped from any application: files, moved or (with Option) copied. */
 const DROP_ACCEPT = ['files'] as const;
 const DROP_ACTIONS = ['move', 'copy'] as const;
+const FILL = { flex: 1 } as const;
 
 /** A press moved this far is a drag (a mouse) or a scroll (a touch). */
 const DRAG_SLOP = 4;
@@ -730,7 +731,7 @@ export function ItemsView({
             onDragOver={handleDropOver}
             onDragLeave={handleDropLeave}
             onDrop={handleDropFiles}
-            className="flex-1"
+            style={FILL}
           >
             <View ref={dropZone} className="flex-1" onLayout={measureDropZone}>
               <ScrollView
