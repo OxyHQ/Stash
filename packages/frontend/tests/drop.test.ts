@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { canMoveInto, dropAction } from '@/lib/drop';
+import { canMoveInto, dropAction, dropFolderFor } from '@/lib/drop';
 import { cloud, folder, local } from './fixtures';
 
 describe('dropping', () => {
@@ -39,5 +39,16 @@ describe('dropping', () => {
     );
     expect(dropAction([local('a.jpg'), local('notes.md')], album)).toBeNull();
     expect(dropAction([], album)).toBeNull();
+  });
+
+  test('files dropped from another application go into the folder dropped on, else the folder shown', () => {
+    const documents = folder('file:///home/ada/Documents');
+    const home = { kind: 'folder' as const, uri: 'file:///home/ada' };
+    expect(dropFolderFor(home, documents)).toBe('file:///home/ada/Documents');
+    expect(dropFolderFor(home, local('a.txt'))).toBe('file:///home/ada');
+    expect(dropFolderFor(home, null)).toBe('file:///home/ada');
+    expect(dropFolderFor({ kind: 'trash' }, null)).toBeNull();
+    expect(dropFolderFor({ kind: 'cloud' }, cloud('a.txt'))).toBeNull();
+    expect(dropFolderFor({ kind: 'photos' }, documents)).toBe('file:///home/ada/Documents');
   });
 });

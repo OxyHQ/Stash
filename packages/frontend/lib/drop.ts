@@ -3,7 +3,7 @@
  * into a local folder, local files go up to Oxy Files, photos join an album.
  * A target that would do nothing does not light.
  */
-import { type Item, itemKind, type LocalItem } from '@/lib/items';
+import { type Item, itemKind, type LocalItem, type Location } from '@/lib/items';
 import { isSameUri, isWithinUri, parentUri } from '@/lib/local-places';
 
 export type DropTarget =
@@ -45,4 +45,14 @@ export function dropAction(items: readonly Item[], target: DropTarget): DropActi
     case 'album':
       return items.every(isAlbumPhoto) ? 'add-to-album' : null;
   }
+}
+
+/**
+ * Where files dropped from any application (Stash among them) go: into the folder of this device
+ * dropped on, else into the folder shown; nowhere in Oxy Files, the photos, the albums or the
+ * Trash.
+ */
+export function dropFolderFor(location: Location, target: Item | null): string | null {
+  if (target && target.source === 'local' && target.isFolder) return target.uri;
+  return location.kind === 'folder' ? location.uri : null;
 }

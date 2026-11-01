@@ -29,8 +29,13 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from '@oxy.so/bloom/context-menu';
+import {
+  DropZone,
+  type DropTargetDragEvent,
+  type DropTargetDropEvent,
+} from '@oxy.so/bloom/drop-zone';
 import { isCommandKey } from '@oxy.so/bloom/kbd';
-import { usePlatformSurfaces } from '@oxy.so/bloom/platform-surface';
+import { usePlatformDrag, usePlatformSurfaces } from '@oxy.so/bloom/platform-surface';
 import { useTheme } from '@oxy.so/bloom/theme';
 import { Text } from '@oxy.so/bloom/typography';
 import { useMeasuredSizeClass } from '@oxy.so/bloom/hooks';
@@ -89,6 +94,10 @@ import {
   selectOnly,
 } from '@/lib/selection';
 import type { SortColumn, SortOrder } from '@/lib/sorting';
+
+/** What the items take dropped from any application: files, moved or (with Option) copied. */
+const DROP_ACCEPT = ['files'] as const;
+const DROP_ACTIONS = ['move', 'copy'] as const;
 
 /** A press moved this far is a drag (a mouse) or a scroll (a touch). */
 const DRAG_SLOP = 4;
@@ -155,6 +164,12 @@ export interface ItemsViewProps {
   /** Whether dragged items may be dropped on an item (a folder, an album). */
   canDrop: (dragged: readonly Item[], target: Item) => boolean;
   onDrop: (dragged: readonly Item[], target: Item) => void;
+  /**
+   * Files dropped on the items from any application, Stash among them: the folder an item (or
+   * the place, null) takes them into, or null where nothing does; and the drop.
+   */
+  dropFolderFor?: (target: Item | null) => string | null;
+  onDropFiles?: (uris: readonly string[], folderUri: string, action: 'copy' | 'move') => void;
   onAction: (item: Item, action: string) => void;
   /** An item's actions for assistive technology; the same list for items alike. */
   itemActions: (item: Item) => readonly AccessibilityActionInfo[];
@@ -192,6 +207,8 @@ export function ItemsView({
   onOpen,
   canDrop,
   onDrop,
+  dropFolderFor,
+  onDropFiles,
   onAction,
   itemActions,
   menus,
@@ -214,6 +231,14 @@ export function ItemsView({
   const [scrollStep, setScrollStep] = useState(0);
   const [band, setBand] = useState<Box | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  // A drag of files from any application over the items (the platform's, or the browser's): the
+  // folder item it would go into, highlighted as Stash's own drag highlights it.
+  const [dropOver, setDropOver] = useState<string | null>(null);
+  // Where a drag of the items goes once it leaves Stash's own handling: the platform's drag,
+  // between applications (OxyOS ADR 0035), where there is one.
+  const platformDrag = usePlatformDrag();
+  const dragPreview = useRef<ComponentRef<typeof View> | null>(null);
+  const [preview, setPreview] = useState<{ name: string; count: number } | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
 
   // What is drawn: the columns and rows at the width's threshold (a column's
@@ -424,8 +449,28 @@ export function ItemsView({
       return;
     }
     if (!now.hasMoved && distance < DRAG_SLOP) return;
+    const isFirstMove = !now.hasMoved;
     now.hasMoved = true;
     const key = now.key;
+    if (key && isFirstMove && platformDrag) {
+      // The platform takes the drag from here (OxyOS ADR 0035): to a folder of this window or of
+      // another, the dock's Trash, any application. The selected items of this device go as
+      // their files; the platform ends the press, and nothing of Stash's own drag shows.
+      const keys = isSelected(selection, key) ? selection.keys : [key];
+      const files = draggedItems(keys).flatMap((item) =>
+        item.source === 'local' ? [item.uri] : [],
+      );
+      if (files.length > 0) {
+        const first = draggedItems(keys)[0];
+        setPreview({ name: first?.name ?? '', count: files.length });
+        void platformDrag.start({
+          data: { files },
+          actions: ['copy', 'move', 'link'],
+          previewRef: dragPreview,
+        });
+        return;
+      }
+    }
     if (key) {
       const keys = dragging.current?.keys ?? (isSelected(selection, key) ? selection.keys : [key]);
       showDrag({ keys, x: point.x, y: point.y, over: dropTargetAt(point, keys) });
@@ -482,6 +527,41 @@ export function ItemsView({
     collapseOnRelease.current = null;
   };
 
+  // Files dropped from any application: the folder item under the point takes them, else the
+  // place shown. The point is in the drop zone, which holds the scroll view at the window's place
+  // for the items.
+  const dropZone = useRef<ComponentRef<typeof View> | null>(null);
+  const dropOrigin = useRef({ x: 0, y: 0 });
+  const measureDropZone = () => {
+    dropZone.current?.measureInWindow((x, y) => {
+      dropOrigin.current = { x, y };
+    });
+  };
+  const dropTargetOf = (event: DropTargetDragEvent): Item | null => {
+    measureContent();
+    const point = contentPoint(dropOrigin.current.x + event.x, dropOrigin.current.y + event.y);
+    const target = itemAtPoint(point);
+    return target && dropFolderFor?.(target) && target.source === 'local' && target.isFolder
+      ? target
+      : null;
+  };
+  const canTakeDrops =
+    !!onDropFiles &&
+    !!dropFolderFor &&
+    (dropFolderFor(null) !== null ||
+      items.some((item) => item.source === 'local' && item.isFolder));
+  const handleDropOver = (event: DropTargetDragEvent) => {
+    setDropOver(dropTargetOf(event)?.key ?? null);
+  };
+  const handleDropLeave = () => setDropOver(null);
+  const handleDropFiles = ({ action, data, ...at }: DropTargetDropEvent) => {
+    setDropOver(null);
+    const folder = dropFolderFor?.(dropTargetOf({ ...at, action, kinds: at.kinds }));
+    const uris = data.files.flatMap((file) => (file.uri ? [file.uri] : []));
+    if (!folder || uris.length === 0 || action === 'link') return;
+    onDropFiles?.(uris, folder, action);
+  };
+
   const handleLayout = (event: LayoutChangeEvent) => {
     area.onLayout(event);
     onColumnsChange(gridColumns(event.nativeEvent.layout.width, layout));
@@ -520,7 +600,7 @@ export function ItemsView({
     const frame = itemFrame(geometry, index);
     const isItemSelected = isSelected(selection, item.key);
     const thumbnailUrl = thumbnails.get(item.key) ?? null;
-    const isDropTarget = drag?.over === item.key;
+    const isDropTarget = drag?.over === item.key || dropOver === item.key;
     const itemRename = renamingKey === item.key ? rename : null;
     if (mode === 'list') {
       return (
@@ -642,80 +722,120 @@ export function ItemsView({
               hasOriginColumn={hasOriginColumn}
             />
           ) : null}
-          <ScrollView
-            ref={scroller}
+          <DropZone
+            accept={DROP_ACCEPT}
+            actions={DROP_ACTIONS}
+            disabled={!canTakeDrops}
+            onDragEnter={handleDropOver}
+            onDragOver={handleDropOver}
+            onDragLeave={handleDropLeave}
+            onDrop={handleDropFiles}
             className="flex-1"
-            contentContainerClassName="grow"
-            scrollEventThrottle={16}
-            onLayout={viewport.onLayout}
-            onScroll={handleScroll}
           >
+            <View ref={dropZone} className="flex-1" onLayout={measureDropZone}>
+              <ScrollView
+                ref={scroller}
+                className="flex-1"
+                contentContainerClassName="grow"
+                scrollEventThrottle={16}
+                onLayout={viewport.onLayout}
+                onScroll={handleScroll}
+              >
+                <View
+                  ref={content}
+                  testID="items"
+                  className="grow"
+                  style={geometry.arrangement === 'photos' ? undefined : { minHeight: height }}
+                  onLayout={measureContent}
+                  onPointerDown={handlePointerDown}
+                  onStartShouldSetResponder={() =>
+                    pointerType.current !== 'mouse' || pointerButton.current === 0
+                  }
+                  onResponderGrant={handleGrant}
+                  onResponderMove={handleMove}
+                  onResponderRelease={handleRelease}
+                  onResponderTerminate={handleTerminate}
+                  onResponderTerminationRequest={() => gesture.current?.isTouch ?? true}
+                >
+                  {geometry.arrangement === 'photos' ? (
+                    renderPhotoRows()
+                  ) : geometry.arrangement === 'icons' ? (
+                    <View
+                      pointerEvents="box-none"
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: GRID_INSET,
+                        right: GRID_INSET,
+                      }}
+                    >
+                      {items
+                        .slice(drawn.start, drawn.end)
+                        .map((item, offset) => renderItem(item, drawn.start + offset))}
+                    </View>
+                  ) : (
+                    items
+                      .slice(drawn.start, drawn.end)
+                      .map((item, offset) => renderItem(item, drawn.start + offset))
+                  )}
+                  {items.length === 0 ? (
+                    <View
+                      pointerEvents="box-none"
+                      className="absolute inset-x-0 top-20 items-center"
+                    >
+                      {emptyState}
+                    </View>
+                  ) : null}
+                  {band ? (
+                    <View
+                      pointerEvents="none"
+                      className="absolute border border-primary bg-primary/10"
+                      style={{ left: band.x, top: band.y, width: band.width, height: band.height }}
+                    />
+                  ) : null}
+                  {drag ? (
+                    <View
+                      pointerEvents="none"
+                      className="absolute h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2"
+                      style={{ left: drag.x + 8, top: drag.y + 8 }}
+                    >
+                      <Text
+                        variant="caption-1-semibold"
+                        style={{ color: theme.colors.primaryForeground }}
+                      >
+                        {String(drag.keys.length)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+            </View>
+          </DropZone>
+          {preview ? (
             <View
-              ref={content}
-              testID="items"
-              className="grow"
-              style={geometry.arrangement === 'photos' ? undefined : { minHeight: height }}
-              onLayout={measureContent}
-              onPointerDown={handlePointerDown}
-              onStartShouldSetResponder={() =>
-                pointerType.current !== 'mouse' || pointerButton.current === 0
-              }
-              onResponderGrant={handleGrant}
-              onResponderMove={handleMove}
-              onResponderRelease={handleRelease}
-              onResponderTerminate={handleTerminate}
-              onResponderTerminationRequest={() => gesture.current?.isTouch ?? true}
+              ref={dragPreview}
+              pointerEvents="none"
+              className="absolute flex-row items-center gap-2 rounded-xl bg-primary px-3 py-2"
+              style={{ left: -10000, top: 0 }}
             >
-              {geometry.arrangement === 'photos' ? (
-                renderPhotoRows()
-              ) : geometry.arrangement === 'icons' ? (
-                <View
-                  pointerEvents="box-none"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: GRID_INSET,
-                    right: GRID_INSET,
-                  }}
+              <Text
+                variant="body-2-regular"
+                style={{ color: theme.colors.primaryForeground }}
+                numberOfLines={1}
+              >
+                {preview.name}
+              </Text>
+              {preview.count > 1 ? (
+                <Text
+                  variant="caption-1-semibold"
+                  style={{ color: theme.colors.primaryForeground }}
                 >
-                  {items
-                    .slice(drawn.start, drawn.end)
-                    .map((item, offset) => renderItem(item, drawn.start + offset))}
-                </View>
-              ) : (
-                items
-                  .slice(drawn.start, drawn.end)
-                  .map((item, offset) => renderItem(item, drawn.start + offset))
-              )}
-              {items.length === 0 ? (
-                <View pointerEvents="box-none" className="absolute inset-x-0 top-20 items-center">
-                  {emptyState}
-                </View>
-              ) : null}
-              {band ? (
-                <View
-                  pointerEvents="none"
-                  className="absolute border border-primary bg-primary/10"
-                  style={{ left: band.x, top: band.y, width: band.width, height: band.height }}
-                />
-              ) : null}
-              {drag ? (
-                <View
-                  pointerEvents="none"
-                  className="absolute h-6 min-w-6 items-center justify-center rounded-full bg-primary px-2"
-                  style={{ left: drag.x + 8, top: drag.y + 8 }}
-                >
-                  <Text
-                    variant="caption-1-semibold"
-                    style={{ color: theme.colors.primaryForeground }}
-                  >
-                    {String(drag.keys.length)}
-                  </Text>
-                </View>
+                  {String(preview.count)}
+                </Text>
               ) : null}
             </View>
-          </ScrollView>
+          ) : null}
         </View>
       </ContextMenuTrigger>
       <ContextMenuContent>

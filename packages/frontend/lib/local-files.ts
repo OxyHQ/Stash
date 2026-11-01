@@ -150,6 +150,55 @@ export async function moveItems(
   return outcomes;
 }
 
+/**
+ * Copies items into a folder, each as itself (a folder with what it holds), never over an item
+ * there: a name already taken is refused.
+ */
+export async function copyItems(
+  items: readonly LocalItem[],
+  folderUri: string,
+): Promise<LocalOutcome[]> {
+  const destination = new Directory(folderUri);
+  const taken = namesIn(folderUri);
+  const outcomes: LocalOutcome[] = [];
+  for (const item of items) {
+    if (nameProblem(item.name, taken) === 'taken') {
+      outcomes.push({ key: item.key, ok: false, problem: 'exists' });
+      continue;
+    }
+    const entry = entryAt(item);
+    try {
+      await entry.copy(destination);
+      taken.push(item.name);
+      outcomes.push({
+        key: item.key,
+        ok: true,
+        uri: `${folderUri.replace(/\/+$/, '')}/${encodeURIComponent(item.name)}`,
+      });
+    } catch (error) {
+      outcomes.push({ key: item.key, ok: false, problem: problemOf(error, entry, 'copy an item') });
+    }
+  }
+  return outcomes;
+}
+
+/**
+ * The items at `file://` URIs dropped on Stash (by another application or Stash itself), each
+ * from one look at it; a URI that names nothing there now is passed over.
+ */
+export function itemsAtUris(uris: readonly string[]): LocalItem[] {
+  return uris.flatMap((uri) => {
+    try {
+      const folder = new Directory(uri);
+      if (folder.exists) return [itemOf(folder)];
+      const file = new File(uri);
+      return file.exists ? [itemOf(file)] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 /** Deletes items for good: for a platform with no Trash, after the person confirmed it. */
 export function deleteItems(items: readonly LocalItem[]): LocalOutcome[] {
   return items.map((item) => {

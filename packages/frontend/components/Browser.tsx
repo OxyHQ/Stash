@@ -453,6 +453,8 @@ export function Browser({ listing }: { listing: Listing }) {
                   onOpen={activate}
                   canDrop={chooser ? () => false : commands.canDrop}
                   onDrop={commands.drop}
+                  dropFolderFor={chooser ? undefined : commands.dropFolderFor}
+                  onDropFiles={chooser ? undefined : commands.dropFiles}
                   onAction={(item, action) => {
                     if (action === 'activate') activate(item);
                     else if (action === 'select') {
