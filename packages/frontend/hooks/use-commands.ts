@@ -4,7 +4,7 @@ import { useFileActions } from '@/hooks/use-file-actions';
 import { useTransfers } from '@/hooks/use-transfers';
 import { useViewer } from '@/hooks/use-viewer';
 import type { Selection } from '@/lib/selection';
-import { dropAction } from '@/lib/drop';
+import { dropAction, dropFolderFor } from '@/lib/drop';
 import {
   type AlbumPhoto,
   type Item,
@@ -234,6 +234,17 @@ export function useCommands(context: CommandContext) {
         if (targetAlbum)
           runAsync('add photos to an album', () => albumActions.add(targetAlbum, dragged));
       }
+    },
+
+    /**
+     * Files dropped on the items from any application, Stash among them (`DropZone`): into the
+     * folder dropped on, else into the folder shown; nowhere else takes them.
+     */
+    dropFolderFor: (target: Item | null): string | null => dropFolderFor(location, target),
+    dropFiles: (uris: readonly string[], folderUri: string, action: 'copy' | 'move') => {
+      runAsync(action === 'copy' ? 'copy items' : 'move items', () =>
+        fileActions.dropInto(uris, folderUri, action),
+      );
     },
 
     /** Confirmed requests. */

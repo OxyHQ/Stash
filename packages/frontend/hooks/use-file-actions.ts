@@ -12,10 +12,12 @@ import {
   createFolder,
   deleteItems,
   type LocalOutcome,
+  copyItems,
+  itemsAtUris,
   moveItems,
   renameItem,
 } from '@/lib/local-files';
-import { parentUri } from '@/lib/local-places';
+import { isSameUri, parentUri } from '@/lib/local-places';
 import { freeName } from '@/lib/names';
 import { oxyServices } from '@/lib/oxy';
 
@@ -107,6 +109,27 @@ export function useFileActions() {
     async moveInto(items: readonly LocalItem[], folderUri: string): Promise<void> {
       const outcomes = await moveItems(items, folderUri);
       for (const item of items) refreshFolder(parentUri(item.uri));
+      refreshFolder(folderUri);
+      reportLocal(outcomes);
+    },
+
+    /**
+     * Files dropped on a folder (OxyOS ADR 0035): moved, or copied when the drop's action is
+     * a copy (Option held), as Finder does; the items the URIs name now, refreshed where they were
+     * and where they go. Its own items dropped on the folder they are in already stay.
+     */
+    async dropInto(
+      uris: readonly string[],
+      folderUri: string,
+      action: 'copy' | 'move',
+    ): Promise<void> {
+      const items = itemsAtUris(uris).filter(
+        (item) => action === 'copy' || !isSameUri(parentUri(item.uri), folderUri),
+      );
+      if (items.length === 0) return;
+      const outcomes =
+        action === 'copy' ? await copyItems(items, folderUri) : await moveItems(items, folderUri);
+      if (action === 'move') for (const item of items) refreshFolder(parentUri(item.uri));
       refreshFolder(folderUri);
       reportLocal(outcomes);
     },
